@@ -2,20 +2,30 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Naruto World Map 🌏</title>
+  <title>🌍 Naruto RPG World Map</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <div id="world-container">
-    <h1 class="title">🌎 Naruto World Map</h1>
+  <h1 class="title">🌎 Naruto World Map</h1>
+
+  <div id="map-container">
     <div id="map"></div>
-    <div id="info-panel">
-      <div id="region">Region: —</div>
-      <div id="chunk">Chunk: —</div>
-      <button id="sendBtn" class="tg-btn">Send to Bot</button>
+  </div>
+
+  <div id="controls">
+    <button class="arrow" id="up">⬆️</button>
+    <div class="mid-arrows">
+      <button class="arrow" id="left">⬅️</button>
+      <button class="arrow" id="down">⬇️</button>
+      <button class="arrow" id="right">➡️</button>
     </div>
+  </div>
+
+  <div id="info">
+    <p id="region">Region: —</p>
+    <p id="chunk">Chunk: —</p>
   </div>
 
   <script src="script.js"></script>
