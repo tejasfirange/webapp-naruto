@@ -1,349 +1,238 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="utf-8"/>
-<meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>Naruto World — Procedural RPG Map</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Naruto RPG World — Fully Generated</title>
 <style>
-  :root{
-    --bg:#0b0f13; --panel:#0f1720aa; --accent:#ff8c42;
-    --info-bg: rgba(0,0,0,0.6);
+  body {
+    margin: 0;
+    overflow: hidden;
+    background: #0b0e13;
+    font-family: 'Poppins', sans-serif;
+    color: #fff;
+    text-align: center;
   }
-  *{box-sizing:border-box}
-  html,body{height:100%; margin:0; background:linear-gradient(180deg,#071017,#0b0f13); font-family:Inter,system-ui,Segoe UI,Roboto,'Poppins',sans-serif; color:#e6eef6}
-  .wrap{max-width:1200px; margin:18px auto; padding:12px; text-align:center}
-  h1{margin:6px 0 14px; font-size:1.6rem; letter-spacing:0.2px; display:flex;align-items:center;gap:10px; justify-content:center}
-  .title-badge{width:34px;height:34px;border-radius:50%;background:conic-gradient(#00ffd0,#00a7ff,#ffdf5e); box-shadow:0 6px 18px rgba(0,150,255,0.12)}
-  #stage{display:flex;flex-direction:column;align-items:center;gap:12px}
-  /* map container */
-  #mapWrap{position:relative;width:90vw; max-width:1100px; height:62vh; background:linear-gradient(180deg,#1b2430,#0f151a); border-radius:14px; padding:14px; box-shadow:0 12px 40px rgba(0,0,0,0.6); border:1px solid rgba(255,255,255,0.03)}
-  canvas{display:block; width:100%; height:100%; border-radius:10px; background:transparent}
-  /* player marker centered overlay */
-  .playerMarker{
-    position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); width:26px;height:26px;border-radius:50%;
-    background: radial-gradient(circle at 30% 30%, #bff, #0ad); border:3px solid rgba(255,255,255,0.7);
-    box-shadow:0 0 22px rgba(0,200,255,0.28), 0 0 6px rgba(255,255,255,0.06);
-    animation:pl 900ms infinite alternate;
+
+  h1 {
+    margin-top: 10px;
+    font-size: 1.6rem;
+    text-shadow: 0 0 10px #00c8ff;
   }
-  @keyframes pl{to{transform:translate(-50%,-50%) scale(1.2)}}
-  /* controls & info centered below */
-  .hud{display:flex; gap:20px; align-items:center; justify-content:center; margin-top:10px}
-  .controls{display:flex; flex-direction:column; align-items:center; gap:8px}
-  .row{display:flex; gap:8px}
-  button.arrow{
-    width:48px;height:44px;border-radius:8px;border:none;background:rgba(255,255,255,0.04); color:#eaf6ff;cursor:pointer;
-    font-size:18px; box-shadow:0 6px 16px rgba(0,0,0,0.5); transition:all .14s ease;
+
+  #map-container {
+    position: relative;
+    width: 90vw;
+    height: 70vh;
+    margin: 10px auto;
+    border-radius: 16px;
+    overflow: hidden;
+    box-shadow: 0 0 30px rgba(0,0,0,0.6);
+    background: #000;
   }
-  button.arrow:hover{transform:translateY(-3px); box-shadow:0 18px 30px rgba(0,0,0,0.6)}
-  /* info card centered */
-  .infoCard{min-width:260px; background:var(--info-bg); border-radius:10px; padding:10px 14px; text-align:center; box-shadow:0 10px 30px rgba(0,0,0,0.6); border:1px solid rgba(255,255,255,0.03)}
-  .infoCard p{margin:6px 0; font-size:14px}
-  .sendBtn{margin-top:8px;background:var(--accent); color:#fff; padding:8px 12px;border-radius:8px;border:none; cursor:pointer; font-weight:600}
-  .meta{margin-top:10px; color:rgba(230,238,246,0.7); font-size:13px}
-  /* smaller screens */
-  @media (max-width:720px){
-    #mapWrap{height:56vh}
-    button.arrow{width:44px;height:40px}
-    .infoCard{min-width:200px}
+
+  canvas {
+    width: 100%;
+    height: 100%;
+    display: block;
+  }
+
+  .player {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 25px;
+    height: 25px;
+    background: radial-gradient(circle, #00eaff, #0077ff);
+    border-radius: 50%;
+    border: 2px solid white;
+    transform: translate(-50%, -50%);
+    box-shadow: 0 0 15px cyan;
+    animation: pulse 1s infinite alternate;
+  }
+
+  @keyframes pulse {
+    from { transform: translate(-50%, -50%) scale(1); }
+    to { transform: translate(-50%, -50%) scale(1.2); }
+  }
+
+  #controls {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin-top: 10px;
+  }
+
+  .row {
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+  }
+
+  button {
+    background: rgba(0,0,0,0.5);
+    border: 2px solid rgba(255,255,255,0.2);
+    color: white;
+    border-radius: 8px;
+    padding: 10px;
+    cursor: pointer;
+    font-size: 20px;
+    transition: 0.2s;
+  }
+
+  button:hover {
+    background: rgba(0,255,255,0.2);
+    box-shadow: 0 0 10px #00ffff;
+  }
+
+  #info {
+    margin-top: 10px;
+    font-size: 14px;
+    background: rgba(0,0,0,0.5);
+    padding: 10px 15px;
+    border-radius: 10px;
+    display: inline-block;
   }
 </style>
 </head>
 <body>
-  <div class="wrap">
-    <h1><span class="title-badge" aria-hidden></span> Naruto World Map — Procedural Prototype</h1>
+  <h1>🌎 Naruto RPG World Map</h1>
+  <div id="map-container">
+    <canvas id="map"></canvas>
+    <div class="player"></div>
+  </div>
 
-    <div id="stage">
-      <div id="mapWrap">
-        <canvas id="mapCanvas"></canvas>
-        <div class="playerMarker" id="playerMarker" title="You (center)"></div>
-      </div>
-
-      <div class="hud">
-        <div class="controls" aria-hidden>
-          <div class="row"><button class="arrow" id="upBtn">▲</button></div>
-          <div class="row">
-            <button class="arrow" id="leftBtn">◀</button>
-            <button class="arrow" id="downBtn">▼</button>
-            <button class="arrow" id="rightBtn">▶</button>
-          </div>
-        </div>
-
-        <div class="infoCard" role="status" aria-live="polite">
-          <p id="regionLabel">Region: —</p>
-          <p id="chunkLabel">Chunk: —</p>
-          <button class="sendBtn" id="sendBtn">Send to Bot</button>
-        </div>
-      </div>
-
-      <div class="meta">Use arrow keys or WASD. Map is procedurally generated and deterministic — chunks are repeatable by coordinates.</div>
+  <div id="controls">
+    <button id="up">⬆️</button>
+    <div class="row">
+      <button id="left">⬅️</button>
+      <button id="down">⬇️</button>
+      <button id="right">➡️</button>
     </div>
   </div>
 
+  <div id="info">
+    <div id="region">Region: —</div>
+    <div id="chunk">Chunk: —</div>
+  </div>
+
 <script>
-/*
-  Procedural world generator (single-file).
-  - Canvas draws tiles procedurally (no images).
-  - Deterministic pseudo-random noise via seeded hash+interpolate.
-  - Biomes: water, sand, grass, forest, mountain.
-  - Player stays centered; world moves by changing player coordinates.
-  - Arrow keys + buttons move player.
-  - Send button sends JSON via Telegram.WebApp (if available).
-*/
+const canvas = document.getElementById("map");
+const ctx = canvas.getContext("2d");
 
-/* --- Utilities: deterministic pseudo-random / value noise --- */
-function hash2(x,y){ // simple hash -> 0..1
-  let n = x*374761393 + y*668265263; // large primes
-  n = (n ^ (n >> 13)) * 1274126177;
-  n = (n ^ (n >> 16)) >>> 0;
-  return (n % 1000000) / 1000000;
+let width, height;
+let playerX = 0, playerY = 0;
+let tileSize = 40;
+const viewRadius = 15;
+
+// resize canvas
+function resize() {
+  canvas.width = canvas.clientWidth;
+  canvas.height = canvas.clientHeight;
+  width = canvas.width;
+  height = canvas.height;
+  drawMap();
 }
-function smoothstep(t){ return t*t*(3-2*t); }
-function valueNoise(x,y){
-  // integer corners
-  let xi = Math.floor(x), yi = Math.floor(y);
-  let xf = x - xi, yf = y - yi;
-  // 4 corner values
-  let v00 = hash2(xi, yi);
-  let v10 = hash2(xi+1, yi);
-  let v01 = hash2(xi, yi+1);
-  let v11 = hash2(xi+1, yi+1);
-  let ux = smoothstep(xf), uy = smoothstep(yf);
-  let xa = v00*(1-ux) + v10*ux;
-  let xb = v01*(1-ux) + v11*ux;
-  return xa*(1-uy) + xb*uy;
+
+window.addEventListener("resize", resize);
+
+// smooth noise generator
+function noise(x, y) {
+  const n = Math.sin(x * 12.9898 + y * 78.233) * 43758.5453;
+  return n - Math.floor(n);
 }
-function fractalNoise(x,y,octaves=3){
-  let amp=1, freq=1, sum=0, max=0;
-  for(let i=0;i<octaves;i++){
-    sum += valueNoise(x*freq, y*freq) * amp;
+
+// combined fractal noise
+function fractalNoise(x, y) {
+  let total = 0, freq = 0.05, amp = 1, max = 0;
+  for (let i = 0; i < 5; i++) {
+    total += noise(x * freq, y * freq) * amp;
     max += amp;
-    amp *= 0.5; freq *= 2;
+    amp *= 0.5;
+    freq *= 2;
   }
-  return sum/max; // 0..1
+  return total / max;
 }
 
-/* --- Canvas & world settings --- */
-const canvas = document.getElementById('mapCanvas');
-const ctx = canvas.getContext('2d', { alpha: false });
+// biome color generator
+function getBiomeColor(x, y) {
+  const elevation = fractalNoise(x, y);
+  const moisture = fractalNoise(x + 100, y - 100);
 
-function resizeCanvas(){
-  // physical pixel scaling for crispness
-  const rect = canvas.getBoundingClientRect();
-  canvas.width = Math.floor(rect.width * devicePixelRatio);
-  canvas.height = Math.floor(rect.height * devicePixelRatio);
-  ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
-  tileSize = Math.floor(Math.max(44, Math.min(72, rect.width / viewCols)));
-  render(); // re-render on resize
-}
-window.addEventListener('resize', resizeCanvas);
-
-/* world viewport: how many tiles visible horizontally / vertically */
-const viewCols = 14;
-const viewRows = 9;
-let tileSize = 64; // overridden on resize()
-
-/* player (global coordinates) */
-let player = { x: 0, y: 0 };
-
-/* helper: determine biome by noise values */
-function biomeAt(x,y){
-  // use two-noise approach: elevation + moisture
-  let elevation = fractalNoise(x*0.12 + 213.7, y*0.12 - 91.2, 4); // 0..1
-  let moisture = fractalNoise(x*0.09 - 31.4, y*0.09 + 71.9, 3); // 0..1
-  if (elevation < 0.28) return 'water';
-  if (elevation < 0.34) return 'sand';
-  if (elevation > 0.78) return 'mountain';
-  // intermediate: grass vs forest based on moisture
-  if (moisture > 0.55) return 'forest';
-  return 'grass';
-}
-
-/* color palettes & drawing routines for each biome (no images) */
-const palettes = {
-  water: { base:'#0e4c7a', wave:'#69b7f0' },
-  sand: { base:'#cdb77a', speck:'#b49455' },
-  grass: { base:'#3a7a2b', blade:'#69c05a' },
-  forest: { base:'#25602b', tree:'#124116' },
-  mountain: { base:'#7e7b79', rock:'#5a5858' }
-};
-
-function drawTile(px,py, gx,gy){
-  // px,py: screen-top-left for tile in canvas px; gx,gy: global tile coords
-  const s = tileSize;
-  // biome
-  const b = biomeAt(gx,gy);
-
-  // background
-  if (b==='water'){
-    // gradient water + subtle wave arcs
-    const g = ctx.createLinearGradient(px,py, px+s, py+s);
-    g.addColorStop(0, lighten(pal(b).base, -8));
-    g.addColorStop(1, pal(b).base);
-    ctx.fillStyle = g; ctx.fillRect(px,py,s,s);
-    // waves: draw a couple of arcs
-    ctx.strokeStyle = pal(b).wave; ctx.globalAlpha = 0.16;
-    ctx.lineWidth = Math.max(1, s*0.04);
-    const seed = hash2(gx,gy);
-    for(let i=0;i<2;i++){
-      const cx = px + (i+0.3)*s;
-      const cy = py + s*0.3 + (seed*8 % s)*0.02;
-      ctx.beginPath();
-      ctx.arc(cx, cy, s*0.38, Math.PI*0.2, Math.PI*0.8); ctx.stroke();
-    }
-    ctx.globalAlpha = 1;
-  } else if (b==='sand'){
-    ctx.fillStyle = pal(b).base; ctx.fillRect(px,py,s,s);
-    // speckles
-    const seed = Math.floor(hash2(gx,gy)*10);
-    ctx.fillStyle = pal(b).speck; ctx.globalAlpha = 0.18;
-    for(let i=0;i<6;i++){
-      const rx = px + ((i*7 + seed*3) % 10) / 10 * s;
-      const ry = py + ((i*3 + seed*5) % 10) / 10 * s;
-      ctx.fillRect(rx, ry, Math.max(1, s*0.04), Math.max(1, s*0.04));
-    }
-    ctx.globalAlpha = 1;
-  } else if (b==='grass' || b==='forest'){
-    ctx.fillStyle = pal(b).base; ctx.fillRect(px,py,s,s);
-    // blades / trees: small strokes
-    ctx.globalAlpha = 0.22;
-    ctx.strokeStyle = (b==='forest')? pal(b).tree : pal(b).blade;
-    ctx.lineWidth = Math.max(1, s*0.04);
-    const seed = Math.floor(hash2(gx,gy)*20);
-    for(let i=0;i<4;i++){
-      const bx = px + (i*3 + seed) % s / s * s;
-      const by = py + (i*5 + seed*7) % s / s * s;
-      ctx.beginPath();
-      ctx.moveTo(bx, by);
-      ctx.lineTo(bx + (seed%2? -s*0.06 : s*0.06), by - s*0.18);
-      ctx.stroke();
-    }
-    ctx.globalAlpha = 1;
-  } else if (b==='mountain'){
-    ctx.fillStyle = pal(b).base; ctx.fillRect(px,py,s,s);
-    // rock triangles
-    ctx.fillStyle = pal(b).rock; ctx.globalAlpha = 0.92;
-    const seed = Math.floor(hash2(gx,gy)*10);
-    ctx.beginPath();
-    ctx.moveTo(px + s*0.12, py + s*0.86);
-    ctx.lineTo(px + s*0.5, py + s*0.22 - (seed % 3)*s*0.03);
-    ctx.lineTo(px + s*0.88, py + s*0.86);
-    ctx.closePath();
-    ctx.fill();
-    ctx.globalAlpha = 1;
-  }
-
-  // subtle vignette / tile border (soft)
-  ctx.strokeStyle = 'rgba(0,0,0,0.06)';
-  ctx.lineWidth = 1;
-  ctx.strokeRect(px+0.5, py+0.5, s-1, s-1);
-
-  // small region label (tiny)
-  ctx.fillStyle = 'rgba(255,255,255,0.06)';
-  ctx.font = `${Math.max(8, s*0.11)}px serif`;
-  ctx.fillText(tileShort(b), px + 6, py + 14);
-}
-
-function pal(bi){ return palettes[bi] || palettes.grass; }
-function tileShort(b){ return {water:'W', sand:'S', grass:'G', forest:'F', mountain:'M'}[b] || '?' }
-function lighten(hex, amt){
-  // tweak brightness by amt (negative darkens)
-  const c = hex.replace('#','');
-  const num = parseInt(c,16);
-  let r = (num>>16) + amt, g = ((num>>8)&0x00FF) + amt, b = (num & 0x0000FF) + amt;
-  r=Math.max(0,Math.min(255,r)); g=Math.max(0,Math.min(255,g)); b=Math.max(0,Math.min(255,b));
-  return '#' + (r<<16 | g<<8 | b).toString(16).padStart(6,'0');
-}
-
-/* --- Rendering: draw tiles around player to create infinite-feel world --- */
-function render(){
-  if (!canvas.width || !canvas.height) return;
-  const cw = canvas.width / devicePixelRatio;
-  const ch = canvas.height / devicePixelRatio;
-  // compute tile size from canvas area and configured view
-  const cols = viewCols; const rows = viewRows;
-  tileSize = Math.floor(Math.max(36, Math.min(84, Math.min(cw/cols, ch/rows))));
-  // center offsets (we draw so player stays centered)
-  const centerPixelX = cw/2; const centerPixelY = ch/2;
-  // how many tiles span left/top relative to player's tile center
-  const halfCols = Math.floor(cols/2), halfRows = Math.floor(rows/2);
-
-  // clear
-  ctx.fillStyle = '#0b1116'; ctx.fillRect(0,0,cw,ch);
-
-  // draw tiles row-major
-  for(let ry = -halfRows; ry <= halfRows; ry++){
-    for(let rx = -halfCols; rx <= halfCols; rx++){
-      const gx = player.x + rx;
-      const gy = player.y + ry;
-      const px = Math.round(centerPixelX + rx * tileSize - tileSize/2);
-      const py = Math.round(centerPixelY + ry * tileSize - tileSize/2);
-      drawTile(px,py, gx,gy);
-    }
-  }
-
-  // highlight the chunk under player with a ring
-  ctx.strokeStyle = 'rgba(255,255,255,0.12)';
-  ctx.lineWidth = 3; ctx.beginPath();
-  const ringX = centerPixelX - tileSize/2 + 2, ringY = centerPixelY - tileSize/2 + 2;
-  ctx.rect(ringX, ringY, tileSize-4, tileSize-4); ctx.stroke();
-
-  // small compass / minimap hint (top-left)
-  ctx.fillStyle = 'rgba(255,255,255,0.02)';
-  ctx.fillRect(12,12,120,36);
-  ctx.fillStyle = 'rgba(255,255,255,0.35)'; ctx.font = '12px Inter';
-  ctx.fillText('Naruto World — procedural', 18, 34);
-}
-
-/* --- center UI updates --- */
-const regionLabel = document.getElementById('regionLabel');
-const chunkLabel = document.getElementById('chunkLabel');
-function updateLabels(){
-  const b = biomeAt(player.x, player.y);
-  regionLabel.textContent = `Region: ${b[0].toUpperCase() + b.slice(1)}`;
-  chunkLabel.textContent = `Chunk: ${player.x}, ${player.y}`;
-}
-
-/* --- movement --- */
-function move(dx,dy){
-  player.x += dx; player.y += dy;
-  updateLabels();
-  render();
-}
-document.getElementById('upBtn').addEventListener('click', ()=>move(0,-1));
-document.getElementById('downBtn').addEventListener('click', ()=>move(0,1));
-document.getElementById('leftBtn').addEventListener('click', ()=>move(-1,0));
-document.getElementById('rightBtn').addEventListener('click', ()=>move(1,0));
-
-/* keyboard */
-window.addEventListener('keydown', (e)=>{
-  if (['INPUT','TEXTAREA'].includes(document.activeElement.tagName)) return;
-  const key = e.key.toLowerCase();
-  if (key === 'arrowup' || key === 'w') { move(0,-1); e.preventDefault(); }
-  if (key === 'arrowdown' || key === 's') { move(0,1); e.preventDefault(); }
-  if (key === 'arrowleft' || key === 'a') { move(-1,0); e.preventDefault(); }
-  if (key === 'arrowright' || key === 'd') { move(1,0); e.preventDefault(); }
-});
-
-/* Send to Bot (Telegram WebApp if available) */
-const sendBtn = document.getElementById('sendBtn');
-sendBtn.addEventListener('click', ()=>{
-  const payload = { region: biomeAt(player.x,player.y), chunk:`${player.x},${player.y}`, coords:{x:player.x,y:player.y} };
-  if (window.Telegram && Telegram.WebApp && Telegram.WebApp.sendData){
-    Telegram.WebApp.sendData(JSON.stringify(payload));
-    // don't close automatically: user might want to confirm
+  if (elevation < 0.3) {
+    return { color: "#1565c0", name: "Ocean" }; // deep blue
+  } else if (elevation < 0.38) {
+    return { color: "#f2d16b", name: "Beach" }; // sand
+  } else if (elevation < 0.6) {
+    if (moisture > 0.5) return { color: "#3ba045", name: "Forest" };
+    return { color: "#7ac142", name: "Grassland" };
+  } else if (elevation < 0.75) {
+    return { color: "#a67c52", name: "Highlands" };
   } else {
-    // show JSON for testing when not in Telegram
-    alert('WebApp send (simulated):\n' + JSON.stringify(payload, null, 2));
+    return { color: "#8b8b8b", name: "Mountains" };
   }
+}
+
+// draw world tiles
+function drawMap() {
+  ctx.clearRect(0, 0, width, height);
+  const cols = Math.ceil(width / tileSize);
+  const rows = Math.ceil(height / tileSize);
+  const offsetX = playerX * tileSize;
+  const offsetY = playerY * tileSize;
+  const startX = -Math.floor(cols / 2);
+  const startY = -Math.floor(rows / 2);
+
+  for (let y = startY; y < startY + rows; y++) {
+    for (let x = startX; x < startX + cols; x++) {
+      const gx = x + playerX;
+      const gy = y + playerY;
+      const biome = getBiomeColor(gx, gy);
+      const px = (x - startX) * tileSize;
+      const py = (y - startY) * tileSize;
+
+      ctx.fillStyle = biome.color;
+      ctx.fillRect(px, py, tileSize, tileSize);
+    }
+  }
+
+  // overlay smooth vignette for depth
+  const grad = ctx.createRadialGradient(width / 2, height / 2, width / 6, width / 2, height / 2, width / 1.2);
+  grad.addColorStop(0, "rgba(0,0,0,0)");
+  grad.addColorStop(1, "rgba(0,0,0,0.6)");
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, width, height);
+
+  updateInfo();
+}
+
+// info panel
+function updateInfo() {
+  const biome = getBiomeColor(playerX, playerY);
+  document.getElementById("region").textContent = `Region: ${biome.name}`;
+  document.getElementById("chunk").textContent = `Chunk: ${playerX}, ${playerY}`;
+}
+
+// move & redraw
+function move(dx, dy) {
+  playerX += dx;
+  playerY += dy;
+  drawMap();
+}
+
+document.getElementById("up").onclick = () => move(0, -1);
+document.getElementById("down").onclick = () => move(0, 1);
+document.getElementById("left").onclick = () => move(-1, 0);
+document.getElementById("right").onclick = () => move(1, 0);
+
+window.addEventListener("keydown", e => {
+  if (["ArrowUp", "w", "W"].includes(e.key)) move(0, -1);
+  if (["ArrowDown", "s", "S"].includes(e.key)) move(0, 1);
+  if (["ArrowLeft", "a", "A"].includes(e.key)) move(-1, 0);
+  if (["ArrowRight", "d", "D"].includes(e.key)) move(1, 0);
 });
 
-/* initialization */
-updateLabels();
-resizeCanvas(); // initial resize + render
-
-// small auto-resize observer for container changes
-const obs = new ResizeObserver(()=> resizeCanvas());
-obs.observe(document.getElementById('mapWrap'));
+resize();
 </script>
 </body>
 </html>
