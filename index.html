@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Naruto World Prototype</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <style>
+    body {
+      margin: 0;
+      overflow: hidden;
+      font-family: 'Poppins', sans-serif;
+      background: #222;
+      color: white;
+    }
+    #map {
+      display: grid;
+      grid-template-columns: repeat(24, 1fr);
+      grid-template-rows: repeat(8, 1fr);
+      width: 90vw;
+      height: 70vh;
+      margin: 5vh auto;
+      border: 2px solid #fff;
+      border-radius: 10px;
+    }
+    .tile {
+      border: 1px solid rgba(255,255,255,0.2);
+      transition: background 0.3s;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      font-size: 10px;
+    }
+    #info {
+      text-align: center;
+      font-size: 16px;
+      margin-top: 10px;
+    }
+    .player {
+      background: rgba(255,255,255,0.7);
+      border-radius: 50%;
+      width: 14px;
+      height: 14px;
+    }
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+  <div id="info">Click a tile to move</div>
+  <script>
+    const tg = window.Telegram.WebApp;
+    tg.expand();
+
+    const regions = [
+      { name: "Land of Fire", color: "#ff7043", startX: 0, endX: 7 },
+      { name: "Land of Water", color: "#42a5f5", startX: 8, endX: 15 },
+      { name: "Land of Wind", color: "#ffee58", startX: 16, endX: 23 }
+    ];
+
+    const map = document.getElementById("map");
+    const info = document.getElementById("info");
+
+    const gridWidth = 24;
+    const gridHeight = 8;
+    let playerPos = { x: 3, y: 4 };
+
+    for (let y = 0; y < gridHeight; y++) {
+      for (let x = 0; x < gridWidth; x++) {
+        const tile = document.createElement("div");
+        tile.className = "tile";
+        const region = regions.find(r => x >= r.startX && x <= r.endX);
+        tile.style.background = region.color + "33";
+        tile.dataset.region = region.name;
+        tile.dataset.x = x;
+        tile.dataset.y = y;
+
+        if (x === playerPos.x && y === playerPos.y) {
+          const circle = document.createElement("div");
+          circle.className = "player";
+          tile.appendChild(circle);
+        }
+
+        tile.onclick = () => {
+          playerPos = { x, y };
+          updateMap();
+          const chunk = `C-${x}-${y}`;
+          info.innerHTML = `Region: ${region.name} | Chunk: ${chunk}`;
+          tg.MainButton.setText(`Send ${region.name} - ${chunk}`).show().onClick(() => {
+            tg.sendData(JSON.stringify({
+              region: region.name,
+              chunk: chunk,
+              coords: playerPos
+            }));
+            tg.close();
+          });
+        };
+
+        map.appendChild(tile);
+      }
+    }
+
+    function updateMap() {
+      const tiles = document.querySelectorAll(".tile");
+      tiles.forEach(t => t.innerHTML = "");
+      const tile = [...tiles].find(t => t.dataset.x == playerPos.x && t.dataset.y == playerPos.y);
+      if (tile) {
+        const circle = document.createElement("div");
+        circle.className = "player";
+        tile.appendChild(circle);
+      }
+    }
+  </script>
+</body>
+</html>
