@@ -1,447 +1,332 @@
 <!doctype html>
 <html lang="en">
 <head>
-<meta charset="utf-8"/>
-<meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>1000×1000 Hybrid World — Prototype</title>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Naruto-Themed World Map Prototype</title>
 <style>
-  :root{--ui-bg:rgba(8,10,14,0.85);--panel:#0f1720;--muted:#9aa4b2;}
-  html,body{height:100%;margin:0;background:linear-gradient(180deg,#07111a,#021018);color:#e6eef6;font-family:Inter,system-ui,Segoe UI,Roboto, "Poppins", sans-serif;}
-  #app{display:flex;flex-direction:column;height:100vh;padding:12px;box-sizing:border-box;gap:10px;}
-  header{display:flex;align-items:center;gap:12px;}
-  h1{font-size:18px;margin:0;}
-  #viewport-wrap{position:relative;flex:1;border-radius:12px;overflow:hidden;box-shadow:0 10px 30px rgba(0,0,0,0.6);background:linear-gradient(180deg,#08121a,#07111a);}
-  canvas{display:block;width:100%;height:100%;}
-  #ui-top{position:absolute;left:12px;top:12px;display:flex;gap:8px;align-items:center;}
-  .btn{background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.06);padding:6px 8px;border-radius:8px;color:#dfe8f2;cursor:pointer;font-size:13px;}
-  .panel{position:absolute;right:12px;top:12px;background:var(--ui-bg);padding:8px;border-radius:10px;border:1px solid rgba(255,255,255,0.03);min-width:170px;}
-  .panel h3{margin:0 0 6px 0;font-size:13px}
-  .info-line{font-size:13px;color:var(--muted);margin:4px 0;}
-  #minimap{position:absolute;right:12px;bottom:12px;border-radius:8px;border:1px solid rgba(255,255,255,0.04);overflow:hidden;background:#07131a;}
-  #minimap canvas{display:block;width:200px;height:120px;}
-  #tile-info{position:absolute;left:12px;bottom:12px;background:var(--ui-bg);padding:10px;border-radius:10px;min-width:220px;border:1px solid rgba(255,255,255,0.03);}
-  label{display:block;font-size:12px;color:var(--muted);margin-bottom:6px}
-  .controls{display:flex;gap:6px}
-  .small{font-size:12px;padding:6px 8px}
+  :root{--ui-bg:rgba(10,10,10,0.6);--accent:#ffd166}
+  body{margin:0; font-family:Inter, system-ui, Arial, sans-serif; background:#111; color:#eee; overflow:hidden}
+  #game { position:relative; width:100vw; height:100vh; display:flex; align-items:center; justify-content:center; }
+  canvas{ background:#000; image-rendering:pixelated; box-shadow:0 8px 30px rgba(0,0,0,0.7); border-radius:8px }
+  #ui { position:absolute; left:18px; bottom:18px; display:flex; gap:10px; align-items:center; }
+  .dpad{ width:140px; height:140px; display:grid; grid-template-columns:repeat(3,1fr); grid-template-rows:repeat(3,1fr); gap:6px; background:var(--ui-bg); padding:6px; border-radius:12px; }
+  .dpad button{ background:transparent; border:1px solid rgba(255,255,255,0.06); color:#fff; font-size:18px; border-radius:6px; cursor:pointer }
+  .dpad button:active{ transform:translateY(1px); }
+  #hud { position:absolute; right:18px; top:18px; background:var(--ui-bg); padding:12px 16px; border-radius:10px; font-size:14px }
+  #minimap{ width:160px; height:160px; display:block; border-radius:6px; background:#000; margin-top:8px; image-rendering:pixelated; }
+  #legend{ margin-top:8px; font-size:12px; color:#ddd }
+  #controlsSmall{ position:absolute; left:18px; top:18px; background:var(--ui-bg); padding:8px 10px; border-radius:8px; font-size:13px }
+  .label{ position:absolute; left:50%; transform:translateX(-50%); top:18px; color:#fff; font-weight:700; text-shadow:0 2px 6px rgba(0,0,0,0.7); font-size:20px }
+  a.download { color:var(--accent); text-decoration:none; margin-left:8px }
+  footer{ position:absolute; left:50%; transform:translateX(-50%); bottom:8px; font-size:12px; color:#bbb }
 </style>
 </head>
 <body>
-<div id="app">
-  <header>
-    <h1>Hybrid World — 1000×1000 Prototype</h1>
-    <div style="margin-left:auto;display:flex;gap:8px">
-      <button id="resetBtn" class="btn">Reset view</button>
-      <button id="centerPlayer" class="btn">Center player</button>
-    </div>
-  </header>
+<div id="game">
+  <canvas id="canvas" width="960" height="640"></canvas>
+  <div class="label">Naruto-Themed World (Prototype)</div>
 
-  <div id="viewport-wrap">
-    <canvas id="main-canvas"></canvas>
-
-    <div id="ui-top">
-      <div class="panel">
-        <h3>Camera</h3>
-        <div class="info-line" id="info-region">Region: —</div>
-        <div class="info-line" id="info-coords">Tile: —</div>
-        <div class="info-line" id="info-elev">Elevation: —</div>
-      </div>
-    </div>
-
-    <div id="tile-info" style="display:none">
-      <h3 style="margin:0 0 6px 0">Tile Info</h3>
-      <div class="info-line" id="ti-coords">Coords: —</div>
-      <div class="info-line" id="ti-terrain">Terrain: —</div>
-      <div class="info-line" id="ti-elev">Elevation: —</div>
-      <div class="info-line" id="ti-resource">Resource: —</div>
-      <div style="margin-top:8px" class="controls">
-        <button id="closeTile" class="btn small">Close</button>
-      </div>
-    </div>
-
-    <div id="minimap">
-      <canvas id="mini-canvas" width="200" height="120"></canvas>
+  <div id="ui">
+    <div class="dpad" aria-hidden="true">
+      <div></div><button id="up">▲</button><div></div>
+      <button id="left">◀</button><div></div><button id="right">▶</button>
+      <div></div><button id="down">▼</button><div></div>
     </div>
   </div>
 
-  <footer style="display:flex;gap:8px;align-items:center">
-    <label style="margin:0">Controls: drag to pan • wheel to zoom • click tile for info • arrow/WASD to nudge</label>
-    <div style="margin-left:auto;display:flex;gap:6px">
-      <button id="zoomIn" class="btn small">Zoom +</button>
-      <button id="zoomOut" class="btn small">Zoom −</button>
+  <div id="hud">
+    <div><strong>Player</strong>: Centered</div>
+    <canvas id="minimap"></canvas>
+    <div id="legend">
+      <div>Water • Forest • Grass • Sand • Mountain • Village</div>
     </div>
-  </footer>
+  </div>
+
+  <div id="controlsSmall">Move: WASD / Arrow keys • Click map to teleport</div>
+  <footer>Prototype map: use the arrows or WASD to explore. Player remains centered until edge.</footer>
 </div>
 
 <script>
-/* =========================
-   CONFIG
-   ========================= */
-const WORLD_W = 1000, WORLD_H = 1000;   // logical tile grid
-const BASE_TILE_PX = 8;                 // base tile size in pixels at scale=1
-const MAX_SCALE = 3.5, MIN_SCALE = 0.2;
+/* ==== Configuration ==== */
+const WORLD_SIZE = 500;               // 500x500 tiles
+const TILE_SIZE = 8;                  // logical tile size in world px (render scaled)
+const VIEW_TILES_X = 120;             // how many world tiles across the viewport (scaled)
+const VIEW_TILES_Y = 80;              // vertical tiles
+const CANVAS_W = 960, CANVAS_H = 640; // canvas physical size
+const SEED = 12345;                   // seed for reproducible map
 
-const villages = [
-  {x: 50, y: 20, name: "Konoha"},
-  {x: -90, y: 40, name: "Sunagakure"},
-  {x: 20, y: 110, name: "Kirigakure"},
-  {x: 130, y: -50, name: "Kumogakure"},
-  {x: -110, y: -70, name: "Iwagakure"}
+/* ==== Simple seeded value noise implementation ==== */
+function mulberry32(a) {
+  return function() {
+    var t = a += 0x6D2B79F5;
+    t = Math.imul(t ^ t >>> 15, t | 1);
+    t ^= t + Math.imul(t ^ t >>> 7, t | 61);
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  }
+}
+const rnd = mulberry32(SEED);
+
+/* Create a pseudo-noise grid using bilinear interpolation */
+function generateValueNoise(w, h, scale, seedOffset=0) {
+  const localRnd = mulberry32(SEED + seedOffset);
+  // coarse grid
+  const gridW = Math.ceil(w/scale)+1, gridH = Math.ceil(h/scale)+1;
+  const grid = Array.from({length:gridH}, () => Array.from({length:gridW}, ()=> localRnd()));
+  function lerp(a,b,t){return a + (b-a)*t}
+  const out = Array.from({length:h}, ()=> new Float32Array(w));
+  for(let y=0;y<h;y++){
+    const gy = y/scale;
+    const iy = Math.floor(gy), fy = gy - iy;
+    for(let x=0;x<w;x++){
+      const gx = x/scale;
+      const ix = Math.floor(gx), fx = gx - ix;
+      const v00 = grid[iy][ix], v10 = grid[iy][ix+1], v01 = grid[iy+1][ix], v11 = grid[iy+1][ix+1];
+      const ix0 = lerp(v00, v10, fx), ix1 = lerp(v01, v11, fx);
+      out[y][x] = lerp(ix0, ix1, fy);
+    }
+  }
+  return out;
+}
+
+/* ==== Map generation ==== */
+const heightMap = generateValueNoise(WORLD_SIZE, WORLD_SIZE, 80, 0);
+const moistureMap = generateValueNoise(WORLD_SIZE, WORLD_SIZE, 40, 7);
+const featureMap = generateValueNoise(WORLD_SIZE, WORLD_SIZE, 18, 99);
+
+const map = Array.from({length:WORLD_SIZE}, ()=> Array(WORLD_SIZE).fill(null));
+
+function assignTiles() {
+  for(let y=0;y<WORLD_SIZE;y++){
+    for(let x=0;x<WORLD_SIZE;x++){
+      const h = heightMap[y][x];      // 0..1
+      const m = moistureMap[y][x];    // 0..1
+      const f = featureMap[y][x];     // 0..1
+      let tile = { type:'grass', sub:null, x, y };
+      // bias to create interesting islands and continents
+      if (h < 0.34) tile.type = 'water';
+      else if (h < 0.36) tile.type = 'beach';
+      else {
+        if (m > 0.72 && h > 0.45) tile.type = 'forest';
+        else if (m < 0.35 && h < 0.6) tile.type = 'sand';
+        else if (h > 0.78) tile.type = 'mountain';
+        else tile.type = 'grass';
+      }
+      // place villages and points of interest (naruto-themed)
+      if (tile.type !== 'water' && f > 0.995 && Math.random() > 0.5) {
+        tile.sub = 'village';
+      } else if (tile.type === 'mountain' && f > 0.98) {
+        tile.sub = 'cave';
+      } else if (tile.type === 'forest' && f > 0.99) {
+        tile.sub = 'shrine';
+      }
+      map[y][x] = tile;
+    }
+  }
+}
+assignTiles();
+
+/* Add named regions (approximate) using rough rectangles */
+const regions = [
+  {name:'Land of Fire', x1:150, y1:180, x2:330, y2:360, color:'#2f5b1a'},
+  {name:'Land of Water', x1:340, y1:40, x2:499, y2:200, color:'#1b6ea8'},
+  {name:'Land of Wind', x1:10, y1:330, x2:140, y2:490, color:'#c89c52'},
+  {name:'Land of Lightning', x1:360, y1:0, x2:499, y2:40, color:'#8393c6'},
+  {name:'Land of Earth', x1:0, y1:0, x2:120, y2:140, color:'#9a7f4d'},
 ];
 
-/* =========================
-   CANVAS + CAMERA STATE
-   ========================= */
-const canvas = document.getElementById('main-canvas');
-const ctx = canvas.getContext('2d', { alpha: false });
-const miniCanvas = document.getElementById('mini-canvas');
-const mctx = miniCanvas.getContext('2d');
+/* ==== Rendering ==== */
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+const minimap = document.getElementById('minimap');
+const mctx = minimap.getContext('2d');
 
-let cw = 0, ch = 0;
+let scale = 4; // pixels per tile on main canvas (rendered scaled)
+let viewW = Math.floor(CANVAS_W / scale);
+let viewH = Math.floor(CANVAS_H / scale);
 
-// camera in tile coordinates (not pixels). camera.x/camera.y is the tile at center.
-const camera = { x: 0, y: 0, scale: 1.0 };
+let player = { x: Math.floor(WORLD_SIZE/2), y: Math.floor(WORLD_SIZE/2) };
+let camera = { x: player.x - Math.floor(viewW/2), y: player.y - Math.floor(viewH/2) };
 
-// small "player" position (for center-player button)
-const player = { x: 0, y: 0 };
-
-/* =========================
-   SIMPLE FRACTAL NOISE (fast, deterministic)
-   - Not a full Simplex/Perlin library but adequate for prototype
-   ========================= */
-function hash(n){ return Math.abs(Math.sin(n)*1e4)%1; }
-function pseudoNoise(x,y){
-  // combine coords with primes to get repeatable pseudo noise
-  const n = Math.sin(x*127.1 + y*311.7)*43758.5453;
-  return n - Math.floor(n);
+/* clamp camera */
+function clampCamera() {
+  camera.x = Math.max(0, Math.min(WORLD_SIZE - viewW, player.x - Math.floor(viewW/2)));
+  camera.y = Math.max(0, Math.min(WORLD_SIZE - viewH, player.y - Math.floor(viewH/2)));
 }
-function smoothNoise(x,y){
-  const ix = Math.floor(x), iy = Math.floor(y);
-  const fx = x - ix, fy = y - iy;
-  const a = pseudoNoise(ix, iy);
-  const b = pseudoNoise(ix+1, iy);
-  const c = pseudoNoise(ix, iy+1);
-  const d = pseudoNoise(ix+1, iy+1);
-  // smoothstep
-  const u = fx*fx*(3-2*fx);
-  const v = fy*fy*(3-2*fy);
-  return a*(1-u)*(1-v) + b*u*(1-v) + c*(1-u)*v + d*u*v;
-}
-function fractalNoise(x,y,oct=4){
-  let total=0, amp=1, freq=1, max=0;
-  for(let i=0;i<oct;i++){
-    total += smoothNoise(x*freq, y*freq)*amp;
-    max += amp;
-    amp *= 0.5;
-    freq *= 2;
+
+/* palette */
+function terrainColor(t) {
+  switch(t){
+    case 'water': return '#0e4f6a';
+    case 'beach': return '#e9cf76';
+    case 'sand': return '#d9b38c';
+    case 'forest': return '#2e6b34';
+    case 'mountain': return '#6b5848';
+    case 'grass': default: return '#4aa04a';
   }
-  return total/max;
 }
 
-/* terrain mapping */
-function sampleTile(tx, ty){
-  // tx,ty are tile coords (can be negative or large)
-  // Map them to a normalized noise space
-  const nx = tx * 0.01;
-  const ny = ty * 0.01;
-  const elevation = fractalNoise(nx, ny, 5);           // 0..1
-  const moisture  = fractalNoise(nx + 100, ny - 50, 4); // 0..1
-  // derive a simple biome
-  let terrain = 'plains';
-  if (elevation < 0.29) terrain = 'deepwater';
-  else if (elevation < 0.34) terrain = 'shallow';
-  else if (elevation < 0.38) terrain = 'beach';
-  else if (elevation < 0.56) terrain = moisture > 0.55 ? 'forest' : 'grass';
-  else if (elevation < 0.75) terrain = 'hills';
-  else terrain = 'mountain';
-
-  // resources: probabilistic and dependent on terrain + noise
-  let resource = null;
-  const rnd = fractalNoise(nx*3.7, ny*7.3, 3);
-  if (terrain === 'mountain' && rnd > 0.7) resource = 'ore';
-  if (terrain === 'forest' && rnd > 0.75) resource = 'herbs';
-  if (terrain === 'shallow' && rnd > 0.86) resource = 'clams';
-
-  // village detection (sparse)
-  let village = null;
-  for(const v of villages){
-    if (Math.hypot(tx - v.x, ty - v.y) < 5) { village = v.name; break; }
+/* draw small textured tile */
+function drawTile(x,y,tile, sx, sy) {
+  ctx.fillStyle = terrainColor(tile.type);
+  ctx.fillRect(sx, sy, scale, scale);
+  // small texture accents
+  if (tile.type === 'forest' && Math.random() < 0.08) {
+    ctx.fillStyle = '#1b3f1a';
+    ctx.fillRect(sx + ( (x+y) % scale), sy + ((x*2+y) % scale), 1, 1);
   }
-
-  return { terrain, elevation, moisture, resource, village };
+  if (tile.type === 'water') {
+    ctx.fillStyle = 'rgba(255,255,255,0.06)';
+    ctx.fillRect(sx, sy, scale, Math.max(1, Math.floor(scale/6)));
+  }
+  if (tile.sub === 'village') {
+    ctx.fillStyle = '#f6d365';
+    ctx.fillRect(sx + Math.floor(scale/4), sy + Math.floor(scale/4), Math.max(1, Math.floor(scale/2)), Math.max(1, Math.floor(scale/2)));
+  }
+  if (tile.sub === 'cave') {
+    ctx.fillStyle = '#222';
+    ctx.fillRect(sx + Math.floor(scale/3), sy + Math.floor(scale/3), Math.max(1, Math.floor(scale/3)), Math.max(1, Math.floor(scale/3)));
+  }
+  if (tile.sub === 'shrine') {
+    ctx.fillStyle = '#ffd166';
+    ctx.fillRect(sx + Math.floor(scale/3), sy + Math.floor(scale/3), Math.max(1, Math.floor(scale/3)), Math.max(1, Math.floor(scale/3)));
+  }
 }
 
-/* =========================
-   DRAWING: only visible tiles
-   ========================= */
-function resizeCanvas(){
-  canvas.width = canvas.clientWidth;
-  canvas.height = canvas.clientHeight;
-  cw = canvas.width; ch = canvas.height;
-}
-window.addEventListener('resize', ()=>{ resizeCanvas(); draw(); });
-
-function worldToScreen(tileX, tileY){
-  // convert tile coords to canvas pixels
-  const tilePx = BASE_TILE_PX * camera.scale;
-  const cx = cw/2; const cy = ch/2;
-  const sx = cx + (tileX - camera.x) * tilePx;
-  const sy = cy + (tileY - camera.y) * tilePx;
-  return { x: sx, y: sy, tilePx };
-}
-function screenToWorld(px, py){
-  const tilePx = BASE_TILE_PX * camera.scale;
-  const tx = (px - cw/2)/tilePx + camera.x;
-  const ty = (py - ch/2)/tilePx + camera.y;
-  return { x: tx, y: ty };
+/* draw region overlay labels */
+function drawRegionLabels() {
+  ctx.font = "18px serif";
+  ctx.fillStyle = 'rgba(0,0,0,0.5)';
+  ctx.textAlign = 'center';
+  regions.forEach(r=>{
+    const cx = Math.floor((r.x1 + r.x2)/2), cy = Math.floor((r.y1 + r.y2)/2);
+    const sx = (cx - camera.x) * scale + scale/2;
+    const sy = (cy - camera.y) * scale + scale/2;
+    if (sx > -100 && sx < CANVAS_W + 100 && sy > -100 && sy < CANVAS_H + 100) {
+      ctx.fillStyle = 'rgba(0,0,0,0.6)';
+      ctx.fillText(r.name, sx+1, sy+1);
+      ctx.fillStyle = r.color;
+      ctx.fillText(r.name, sx, sy);
+    }
+  });
 }
 
-function getColorForTerrain(t, e){
-  // t = terrain string, e = elevation [0..1]
-  if (t === 'deepwater') return '#07406f';
-  if (t === 'shallow') return '#1f76c6';
-  if (t === 'beach') return '#e7c682';
-  if (t === 'grass') return '#6fb35a';
-  if (t === 'forest') return '#2f7a3a';
-  if (t === 'hills') return '#8a6a47';
-  if (t === 'mountain') return e>0.9 ? '#e6e6e6' : '#a69a86';
-  return '#777';
-}
-
-function draw(){
-  // main draw loop: render visible tiles only
-  ctx.clearRect(0,0,cw,ch);
-  ctx.fillStyle = '#071219';
-  ctx.fillRect(0,0,cw,ch);
-
-  const tilePx = BASE_TILE_PX * camera.scale;
-  // compute visible tile range with 1 tile margin
-  const halfW = cw/2, halfH = ch/2;
-  const leftTile  = Math.floor(camera.x - halfW/tilePx) - 2;
-  const rightTile = Math.ceil (camera.x + halfW/tilePx) + 2;
-  const topTile   = Math.floor(camera.y - halfH/tilePx) - 2;
-  const bottomTile= Math.ceil (camera.y + halfH/tilePx) + 2;
-
-  // clamp draws to world bounds (not necessary for infinite feel but fine)
-  const L = leftTile, R = rightTile, T = topTile, B = bottomTile;
-
-  // draw tiles row by row
-  for(let ty=T; ty<=B; ty++){
-    for(let tx=L; tx<=R; tx++){
-      // quick skip if tile completely off-screen (shouldn't happen after range calc)
-      const s = worldToScreen(tx, ty);
-      if (s.x + tilePx < -20 || s.x > cw+20 || s.y + tilePx < -20 || s.y > ch+20) continue;
-
-      const sample = sampleTile(tx, ty);
-      ctx.fillStyle = getColorForTerrain(sample.terrain, sample.elevation);
-      // subtle shading by elevation
-      const shade = Math.floor((sample.elevation - 0.5)*40);
-      // paint rect
-      ctx.fillRect(Math.round(s.x), Math.round(s.y), Math.ceil(tilePx), Math.ceil(tilePx));
-      // optionally draw resource or village small dot
-      if (sample.resource){
-        ctx.fillStyle = 'rgba(255,255,255,0.9)';
-        ctx.fillRect(Math.round(s.x + tilePx*0.35), Math.round(s.y + tilePx*0.35), Math.max(1, Math.round(tilePx*0.3)), Math.max(1, Math.round(tilePx*0.3)));
+/* main draw function */
+function draw() {
+  ctx.clearRect(0,0,CANVAS_W, CANVAS_H);
+  // draw tiles in view
+  for(let y=0;y<viewH;y++){
+    for(let x=0;x<viewW;x++){
+      const wx = camera.x + x, wy = camera.y + y;
+      if (wx < 0 || wy < 0 || wx >= WORLD_SIZE || wy >= WORLD_SIZE) {
+        ctx.fillStyle = '#000';
+        ctx.fillRect(x*scale, y*scale, scale, scale);
+        continue;
       }
-      if (sample.village){
-        ctx.fillStyle = 'rgba(0,0,0,0.8)';
-        ctx.fillRect(Math.round(s.x + tilePx*0.15), Math.round(s.y + tilePx*0.15), Math.max(1, Math.round(tilePx*0.7)), Math.max(1, Math.round(tilePx*0.7)));
-      }
+      drawTile(wx, wy, map[wy][wx], x*scale, y*scale);
     }
   }
-
-  // draw simple grid optionally when zoomed in
-  if (camera.scale > 1.5){
-    ctx.strokeStyle = 'rgba(0,0,0,0.12)';
-    ctx.lineWidth = 1;
-    for(let ty=T; ty<=B; ty++){
-      const y = worldToScreen(L, ty).y;
-      ctx.beginPath(); ctx.moveTo(worldToScreen(L,ty).x, y); ctx.lineTo(worldToScreen(R,ty).x + tilePx, y); ctx.stroke();
-    }
-    for(let tx=L; tx<=R; tx++){
-      const x = worldToScreen(tx, T).x;
-      ctx.beginPath(); ctx.moveTo(x, worldToScreen(tx,T).y); ctx.lineTo(x, worldToScreen(tx,B).y + tilePx); ctx.stroke();
-    }
-  }
-
-  // draw villages as labelled icons (larger, centered)
-  for(const v of villages){
-    const s = worldToScreen(v.x, v.y);
-    if (s.x < -50 || s.x > cw + 50 || s.y < -50 || s.y > ch + 50) continue;
-    ctx.fillStyle = '#ffd47a';
-    const r = Math.max(2, tilePx*0.9);
-    ctx.beginPath(); ctx.arc(s.x + tilePx/2, s.y + tilePx/2, r, 0, Math.PI*2); ctx.fill();
-    ctx.fillStyle = '#07121a'; ctx.font = `${Math.max(10, tilePx*0.9)}px Inter`;
-    ctx.fillText(v.name, s.x + tilePx/2 + r + 4, s.y + tilePx/2 + 4);
-  }
-
-  // center crosshair
-  ctx.strokeStyle = 'rgba(255,255,255,0.06)';
-  ctx.lineWidth = 1;
+  // draw player center marker
+  const pcx = Math.floor((player.x - camera.x) * scale + scale/2);
+  const pcy = Math.floor((player.y - camera.y) * scale + scale/2);
   ctx.beginPath();
-  ctx.moveTo(cw/2 - 10, ch/2); ctx.lineTo(cw/2 + 10, ch/2);
-  ctx.moveTo(cw/2, ch/2 - 10); ctx.lineTo(cw/2, ch/2 + 10);
-  ctx.stroke();
-
-  drawMiniMap();
-  updateCameraInfo();
+  ctx.fillStyle = '#ff6b6b';
+  ctx.arc(pcx, pcy, Math.max(2, scale*0.9), 0, Math.PI*2);
+  ctx.fill();
+  // draw region labels
+  drawRegionLabels();
+  // draw slight vignette & border
+  ctx.strokeStyle = 'rgba(0,0,0,0.6)';
+  ctx.lineWidth = 3;
+  ctx.strokeRect(0.5,0.5,CANVAS_W-1,CANVAS_H-1);
+  // minimap update
+  drawMinimap();
 }
 
-/* =========================
-   UI: minimap + info
-   ========================= */
-function drawMiniMap(){
-  mctx.clearRect(0,0,miniCanvas.width,miniCanvas.height);
-  // background
-  mctx.fillStyle = '#071219';
-  mctx.fillRect(0,0,miniCanvas.width,miniCanvas.height);
-  // draw a tiny sample of tiles centered on camera (for performance sample a 60x40 box scaled down)
-  const sampleW = 60, sampleH = 40;
-  const tileW = miniCanvas.width / sampleW, tileH = miniCanvas.height / sampleH;
-  for(let sy=0; sy<sampleH; sy++){
-    for(let sx=0; sx<sampleW; sx++){
-      const tx = Math.round(camera.x + (sx - sampleW/2));
-      const ty = Math.round(camera.y + (sy - sampleH/2));
-      const s = sampleTile(tx, ty);
-      mctx.fillStyle = getColorForTerrain(s.terrain, s.elevation);
-      mctx.fillRect(sx*tileW, sy*tileH, Math.ceil(tileW), Math.ceil(tileH));
+/* draw minimap (scaled down) */
+function drawMinimap() {
+  const mmW = minimap.width, mmH = minimap.height;
+  mctx.clearRect(0,0,mmW,mmH);
+  const sx = Math.floor(mmW / WORLD_SIZE), sy = Math.floor(mmH / WORLD_SIZE);
+  // draw coarse blocks for performance
+  const step = Math.max(1, Math.floor(WORLD_SIZE / mmW));
+  for(let y=0;y<WORLD_SIZE;y+=step){
+    for(let x=0;x<WORLD_SIZE;x+=step){
+      const tile = map[y][x];
+      mctx.fillStyle = terrainColor(tile.type);
+      mctx.fillRect(Math.floor(x / WORLD_SIZE * mmW), Math.floor(y / WORLD_SIZE * mmH), Math.ceil(mmW / (WORLD_SIZE/step)), Math.ceil(mmH / (WORLD_SIZE/step)));
     }
   }
-  // player dot in center
-  mctx.fillStyle = '#00e5ff';
-  mctx.beginPath(); mctx.arc(miniCanvas.width/2, miniCanvas.height/2, 3, 0, Math.PI*2); mctx.fill();
+  // player marker
+  mctx.fillStyle = '#ff6b6b';
+  const px = Math.floor(player.x / WORLD_SIZE * mmW), py = Math.floor(player.y / WORLD_SIZE * mmH);
+  mctx.fillRect(px-1, py-1, 3, 3);
 }
 
-/* =========================
-   Camera info / region name
-   ========================= */
-function updateCameraInfo(){
-  const regionName = getRegionName(camera.x, camera.y);
-  document.getElementById('info-region').textContent = `Region: ${regionName}`;
-  document.getElementById('info-coords').textContent = `Tile: ${camera.x.toFixed(2)}, ${camera.y.toFixed(2)}`;
-  const s = sampleTile(Math.round(camera.x), Math.round(camera.y));
-  document.getElementById('info-elev').textContent = `Elevation: ${s.elevation.toFixed(3)} (${s.terrain})`;
-}
-function getRegionName(x,y){
-  // region grid 10x10 over world logical coords - but world is centered around 0 so just compute macro regions
-  const rx = Math.floor((x + WORLD_W/2) / (WORLD_W/10));
-  const ry = Math.floor((y + WORLD_H/2) / (WORLD_H/10));
-  const names = ['A','B','C','D','E','F','G','H','I','J'];
-  return `R${Math.max(0, Math.min(9,rx))}-${Math.max(0, Math.min(9,ry))}`;
-}
-
-/* =========================
-   INPUT: pan by drag, zoom by wheel, click tile
-   ========================= */
-let dragging = false, lastMouse = null;
-canvas.addEventListener('pointerdown', (e)=>{
-  dragging = true; lastMouse = {x:e.clientX, y:e.clientY};
-  canvas.setPointerCapture(e.pointerId);
-});
-window.addEventListener('pointerup', (e)=>{
-  dragging = false; lastMouse = null;
-});
-window.addEventListener('pointermove', (e)=>{
-  if(!dragging) return;
-  const dx = e.clientX - lastMouse.x;
-  const dy = e.clientY - lastMouse.y;
-  const tilePx = BASE_TILE_PX * camera.scale;
-  camera.x -= dx / tilePx; camera.y -= dy / tilePx;
-  lastMouse = {x:e.clientX, y:e.clientY};
-  draw();
-});
-
-canvas.addEventListener('wheel', (e)=>{
-  // zoom to pointer location
+/* ==== Controls & Movement ==== */
+const keys = {};
+window.addEventListener('keydown', (e)=>{
+  keys[e.key.toLowerCase()] = true;
   e.preventDefault();
-  const oldScale = camera.scale;
-  const delta = -e.deltaY;
-  const factor = delta > 0 ? 1.12 : 1/1.12;
-  camera.scale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, camera.scale * factor));
-  // keep world position under cursor stationary
-  const rect = canvas.getBoundingClientRect();
-  const px = e.clientX - rect.left, py = e.clientY - rect.top;
-  const worldBefore = screenToWorld(px, py);
-  // after scale change, compute new camera.x/y so the same world coord stays under px,py
-  const worldAfterScreen = screenToWorld(px, py);
-  camera.x += (worldBefore.x - worldAfterScreen.x);
-  camera.y += (worldBefore.y - worldAfterScreen.y);
-  draw();
-}, { passive:false });
+});
+window.addEventListener('keyup', (e)=>{
+  keys[e.key.toLowerCase()] = false;
+});
 
+function stepMovement() {
+  let mx=0,my=0;
+  if (keys['w'] || keys['arrowup']) my -= 1;
+  if (keys['s'] || keys['arrowdown']) my += 1;
+  if (keys['a'] || keys['arrowleft']) mx -= 1;
+  if (keys['d'] || keys['arrowright']) mx += 1;
+  if (mx !== 0 || my !== 0) {
+    // move player but keep inside bounds
+    player.x = Math.max(0, Math.min(WORLD_SIZE-1, player.x + mx));
+    player.y = Math.max(0, Math.min(WORLD_SIZE-1, player.y + my));
+    clampCamera();
+  }
+}
+
+/* UI buttons */
+document.getElementById('up').addEventListener('mousedown', ()=>{ keys['arrowup']=true });
+document.getElementById('up').addEventListener('mouseup', ()=>{ keys['arrowup']=false });
+document.getElementById('down').addEventListener('mousedown', ()=>{ keys['arrowdown']=true });
+document.getElementById('down').addEventListener('mouseup', ()=>{ keys['arrowdown']=false });
+document.getElementById('left').addEventListener('mousedown', ()=>{ keys['arrowleft']=true });
+document.getElementById('left').addEventListener('mouseup', ()=>{ keys['arrowleft']=false });
+document.getElementById('right').addEventListener('mousedown', ()=>{ keys['arrowright']=true });
+document.getElementById('right').addEventListener('mouseup', ()=>{ keys['arrowright']=false });
+
+/* click to teleport for quick demo */
 canvas.addEventListener('click', (e)=>{
   const rect = canvas.getBoundingClientRect();
-  const px = e.clientX - rect.left, py = e.clientY - rect.top;
-  const world = screenToWorld(px, py);
-  const tileX = Math.floor(world.x + 0.5);
-  const tileY = Math.floor(world.y + 0.5);
-  showTileInfo(tileX, tileY, e.clientX, e.clientY);
-});
-
-/* keyboard nudge */
-window.addEventListener('keydown', (e)=>{
-  const step = 1 / Math.max(1, camera.scale);
-  if (e.key === 'ArrowUp' || e.key === 'w') { camera.y -= step; draw(); }
-  if (e.key === 'ArrowDown' || e.key === 's') { camera.y += step; draw(); }
-  if (e.key === 'ArrowLeft' || e.key === 'a') { camera.x -= step; draw(); }
-  if (e.key === 'ArrowRight' || e.key === 'd') { camera.x += step; draw(); }
-});
-
-/* =========================
-   Tile info UI
-   ========================= */
-function showTileInfo(tileX, tileY, clientX, clientY){
-  const s = sampleTile(tileX, tileY);
-  document.getElementById('ti-coords').textContent = `Coords: ${tileX}, ${tileY}`;
-  document.getElementById('ti-terrain').textContent = `Terrain: ${s.terrain}`;
-  document.getElementById('ti-elev').textContent = `Elevation: ${s.elevation.toFixed(3)}`;
-  document.getElementById('ti-resource').textContent = `Resource: ${s.resource || 'none'}`;
-  const box = document.getElementById('tile-info');
-  box.style.display = 'block';
-  // place near click but inside viewport
-  const wrapRect = canvas.getBoundingClientRect();
-  const xRel = clientX - wrapRect.left;
-  const yRel = clientY - wrapRect.top;
-  // position within viewport wrap
-  box.style.left = Math.min(wrapRect.width - 250, Math.max(12, xRel)) + 'px';
-  box.style.top = Math.min(wrapRect.height - 140, Math.max(12, yRel)) + 'px';
-}
-document.getElementById('closeTile').addEventListener('click', ()=>{ document.getElementById('tile-info').style.display='none' });
-
-/* =========================
-   Buttons
-   ========================= */
-document.getElementById('resetBtn').addEventListener('click', ()=>{
-  camera.x = 0; camera.y = 0; camera.scale = 1.0; draw();
-});
-document.getElementById('centerPlayer').addEventListener('click', ()=>{
-  camera.x = player.x; camera.y = player.y; draw();
-});
-document.getElementById('zoomIn').addEventListener('click', ()=>{ camera.scale = Math.min(MAX_SCALE, camera.scale*1.2); draw(); });
-document.getElementById('zoomOut').addEventListener('click', ()=>{ camera.scale = Math.max(MIN_SCALE, camera.scale/1.2); draw(); });
-
-/* =========================
-   INIT
-   ========================= */
-function screenToWorld(px, py){
-  return {
-    x: (px - cw/2) / (BASE_TILE_PX * camera.scale) + camera.x,
-    y: (py - ch/2) / (BASE_TILE_PX * camera.scale) + camera.y
-  };
-}
-function worldToScreen(tileX, tileY){
-  return {
-    x: cw/2 + (tileX - camera.x) * (BASE_TILE_PX * camera.scale),
-    y: ch/2 + (tileY - camera.y) * (BASE_TILE_PX * camera.scale)
-  }
-}
-
-function init(){
-  resizeCanvas();
-  // starting camera centered near player
-  camera.x = player.x; camera.y = player.y; camera.scale = 1.0;
+  const cx = e.clientX - rect.left, cy = e.clientY - rect.top;
+  const tileX = camera.x + Math.floor(cx / scale), tileY = camera.y + Math.floor(cy / scale);
+  player.x = Math.max(0, Math.min(WORLD_SIZE-1, tileX)); player.y = Math.max(0, Math.min(WORLD_SIZE-1, tileY));
+  clampCamera();
   draw();
+});
+
+/* responsive scaling: adjust viewW/viewH based on scale & canvas */
+function updateView() {
+  viewW = Math.floor(CANVAS_W / scale);
+  viewH = Math.floor(CANVAS_H / scale);
+  clampCamera();
 }
-init();
+
+/* main loop */
+function mainLoop() {
+  stepMovement();
+  draw();
+  requestAnimationFrame(mainLoop);
+}
+
+/* initialize minimap resolution */
+minimap.width = 160; minimap.height = 160;
+
+/* init camera and start */
+clampCamera();
+mainLoop();
 
 </script>
 </body>
