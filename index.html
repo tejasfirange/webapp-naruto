@@ -3,331 +3,179 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Naruto-Themed World Map Prototype</title>
+<title>Naruto World v3 — Placeholder Prototype</title>
 <style>
   :root{--ui-bg:rgba(10,10,10,0.6);--accent:#ffd166}
-  body{margin:0; font-family:Inter, system-ui, Arial, sans-serif; background:#111; color:#eee; overflow:hidden}
-  #game { position:relative; width:100vw; height:100vh; display:flex; align-items:center; justify-content:center; }
-  canvas{ background:#000; image-rendering:pixelated; box-shadow:0 8px 30px rgba(0,0,0,0.7); border-radius:8px }
-  #ui { position:absolute; left:18px; bottom:18px; display:flex; gap:10px; align-items:center; }
-  .dpad{ width:140px; height:140px; display:grid; grid-template-columns:repeat(3,1fr); grid-template-rows:repeat(3,1fr); gap:6px; background:var(--ui-bg); padding:6px; border-radius:12px; }
-  .dpad button{ background:transparent; border:1px solid rgba(255,255,255,0.06); color:#fff; font-size:18px; border-radius:6px; cursor:pointer }
-  .dpad button:active{ transform:translateY(1px); }
-  #hud { position:absolute; right:18px; top:18px; background:var(--ui-bg); padding:12px 16px; border-radius:10px; font-size:14px }
-  #minimap{ width:160px; height:160px; display:block; border-radius:6px; background:#000; margin-top:8px; image-rendering:pixelated; }
-  #legend{ margin-top:8px; font-size:12px; color:#ddd }
-  #controlsSmall{ position:absolute; left:18px; top:18px; background:var(--ui-bg); padding:8px 10px; border-radius:8px; font-size:13px }
-  .label{ position:absolute; left:50%; transform:translateX(-50%); top:18px; color:#fff; font-weight:700; text-shadow:0 2px 6px rgba(0,0,0,0.7); font-size:20px }
-  a.download { color:var(--accent); text-decoration:none; margin-left:8px }
-  footer{ position:absolute; left:50%; transform:translateX(-50%); bottom:8px; font-size:12px; color:#bbb }
+  body{margin:0; font-family:Inter, Arial, sans-serif; background:#0b0b0d; color:#eee; overflow:hidden}
+  #game{position:relative; width:100vw; height:100vh; display:flex; align-items:center; justify-content:center}
+  canvas{ background:#000; image-rendering:pixelated; box-shadow:0 10px 30px rgba(0,0,0,0.6); border-radius:6px }
+  #hud{ position:absolute; right:18px; top:18px; background:var(--ui-bg); padding:10px; border-radius:10px; font-size:13px; min-width:180px }
+  #controls{ position:absolute; left:18px; top:18px; background:var(--ui-bg); padding:10px; border-radius:8px; font-size:13px }
+  #footer{ position:absolute; left:50%; transform:translateX(-50%); bottom:10px; color:#bbb; font-size:12px }
+  #dialog { position:absolute; left:50%; transform:translateX(-50%); bottom:74px; background:rgba(0,0,0,0.7); padding:10px 12px; border-radius:6px; display:none; min-width:260px }
+  .mini{ display:block; margin-top:8px; background:#000; border-radius:6px; image-rendering:pixelated }
+  .legend{ margin-top:8px; font-size:12px; color:#ddd }
 </style>
 </head>
 <body>
 <div id="game">
   <canvas id="canvas" width="960" height="640"></canvas>
-  <div class="label">Naruto-Themed World (Prototype)</div>
-
-  <div id="ui">
-    <div class="dpad" aria-hidden="true">
-      <div></div><button id="up">▲</button><div></div>
-      <button id="left">◀</button><div></div><button id="right">▶</button>
-      <div></div><button id="down">▼</button><div></div>
-    </div>
-  </div>
-
   <div id="hud">
-    <div><strong>Player</strong>: Centered</div>
-    <canvas id="minimap"></canvas>
-    <div id="legend">
-      <div>Water • Forest • Grass • Sand • Mountain • Village</div>
-    </div>
+    <div><strong>Naruto World v3 (placeholder)</strong></div>
+    <div id="coords">Coords: -</div>
+    <div id="region">Region: -</div>
+    <canvas id="minimap" class="mini" width="160" height="160"></canvas>
+    <div class="legend">Controls: WASD / Arrow keys to move • E to interact</div>
   </div>
-
-  <div id="controlsSmall">Move: WASD / Arrow keys • Click map to teleport</div>
-  <footer>Prototype map: use the arrows or WASD to explore. Player remains centered until edge.</footer>
+  <div id="controls">Tiles: 500×500 • Tile:32px • NPCs:20</div>
+  <div id="dialog"></div>
+  <div id="footer">Player moves one tile at a time. Player centered until edge. No click movement.</div>
 </div>
 
 <script>
-/* ==== Configuration ==== */
-const WORLD_SIZE = 500;               // 500x500 tiles
-const TILE_SIZE = 8;                  // logical tile size in world px (render scaled)
-const VIEW_TILES_X = 120;             // how many world tiles across the viewport (scaled)
-const VIEW_TILES_Y = 80;              // vertical tiles
-const CANVAS_W = 960, CANVAS_H = 640; // canvas physical size
-const SEED = 12345;                   // seed for reproducible map
+/* ================== CONFIG ================== */
+const WORLD_SIZE = 500;
+const TILE_PX = 32;
+const CANVAS_W = 960, CANVAS_H = 640;
+const VIEW_TILES_X = Math.floor(CANVAS_W / TILE_PX);
+const VIEW_TILES_Y = Math.floor(CANVAS_H / TILE_PX);
+const DAY_LENGTH_SECONDS = 90;
+const NPC_COUNT = 20;
+const MOVE_TIME = 160;
 
-/* ==== Simple seeded value noise implementation ==== */
-function mulberry32(a) {
-  return function() {
-    var t = a += 0x6D2B79F5;
-    t = Math.imul(t ^ t >>> 15, t | 1);
-    t ^= t + Math.imul(t ^ t >>> 7, t | 61);
-    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+/* ================== SIMPLEX NOISE ================== */
+class Simplex {
+  constructor(r=0){
+    this.p = new Uint8Array(512);
+    let seed = 0x9E3779B9 ^ r;
+    for(let i=0;i<256;i++){ seed = (seed + 0x6D2B79F5) | 0; this.p[i]= (seed >>> (i%24)) & 255; }
+    for(let i=0;i<512;i++) this.p[i]=this.p[i%256];
+  }
+  dot(g, x, y){ return g[0]*x + g[1]*y; }
+  noise2D(xin, yin){
+    const grad3 = [[1,1],[-1,1],[1,-1],[-1,-1],[1,0],[-1,0],[0,1],[0,-1]];
+    const F2 = 0.366025403, G2 = 0.211324865;
+    let n0=0,n1=0,n2=0;
+    let s = (xin+yin)*F2;
+    let i = Math.floor(xin+s), j = Math.floor(yin+s);
+    let t = (i+j)*G2;
+    let X0 = i - t, Y0 = j - t;
+    let x0 = xin - X0, y0 = yin - Y0;
+    let i1= x0>y0?1:0, j1 = x0>y0?0:1;
+    let x1 = x0 - i1 + G2, y1 = y0 - j1 + G2;
+    let x2 = x0 - 1.0 + 2.0*G2, y2 = y0 - 1.0 + 2.0*G2;
+    let ii = i & 255, jj = j & 255;
+    let gi0 = this.p[ii+this.p[jj]] % 8;
+    let gi1 = this.p[ii+i1+this.p[jj+j1]] % 8;
+    let gi2 = this.p[ii+1+this.p[jj+1]] % 8;
+    let t0 = 0.5 - x0*x0 - y0*y0;
+    if(t0>=0){ t0*=t0; n0 = t0 * t0 * this.dot(grad3[gi0], x0, y0); }
+    let t1 = 0.5 - x1*x1 - y1*y1;
+    if(t1>=0){ t1*=t1; n1 = t1 * t1 * this.dot(grad3[gi1], x1, y1); }
+    let t2 = 0.5 - x2*x2 - y2*y2;
+    if(t2>=0){ t2*=t2; n2 = t2 * t2 * this.dot(grad3[gi2], x2, y2); }
+    return 70.0 * (n0 + n1 + n2);
   }
 }
-const rnd = mulberry32(SEED);
+const simplex = new Simplex(1337);
 
-/* Create a pseudo-noise grid using bilinear interpolation */
-function generateValueNoise(w, h, scale, seedOffset=0) {
-  const localRnd = mulberry32(SEED + seedOffset);
-  // coarse grid
-  const gridW = Math.ceil(w/scale)+1, gridH = Math.ceil(h/scale)+1;
-  const grid = Array.from({length:gridH}, () => Array.from({length:gridW}, ()=> localRnd()));
-  function lerp(a,b,t){return a + (b-a)*t}
-  const out = Array.from({length:h}, ()=> new Float32Array(w));
-  for(let y=0;y<h;y++){
-    const gy = y/scale;
-    const iy = Math.floor(gy), fy = gy - iy;
-    for(let x=0;x<w;x++){
-      const gx = x/scale;
-      const ix = Math.floor(gx), fx = gx - ix;
-      const v00 = grid[iy][ix], v10 = grid[iy][ix+1], v01 = grid[iy+1][ix], v11 = grid[iy+1][ix+1];
-      const ix0 = lerp(v00, v10, fx), ix1 = lerp(v01, v11, fx);
-      out[y][x] = lerp(ix0, ix1, fy);
-    }
-  }
-  return out;
-}
+/* ================== WORLD GENERATION ================== */
+const map = new Uint8Array(WORLD_SIZE * WORLD_SIZE);
+const tileInfo = new Array(WORLD_SIZE * WORLD_SIZE);
+function idx(x,y){ return y*WORLD_SIZE + x; }
 
-/* ==== Map generation ==== */
-const heightMap = generateValueNoise(WORLD_SIZE, WORLD_SIZE, 80, 0);
-const moistureMap = generateValueNoise(WORLD_SIZE, WORLD_SIZE, 40, 7);
-const featureMap = generateValueNoise(WORLD_SIZE, WORLD_SIZE, 18, 99);
-
-const map = Array.from({length:WORLD_SIZE}, ()=> Array(WORLD_SIZE).fill(null));
-
-function assignTiles() {
+function generateWorld(){
   for(let y=0;y<WORLD_SIZE;y++){
     for(let x=0;x<WORLD_SIZE;x++){
-      const h = heightMap[y][x];      // 0..1
-      const m = moistureMap[y][x];    // 0..1
-      const f = featureMap[y][x];     // 0..1
-      let tile = { type:'grass', sub:null, x, y };
-      // bias to create interesting islands and continents
-      if (h < 0.34) tile.type = 'water';
-      else if (h < 0.36) tile.type = 'beach';
+      const h = (simplex.noise2D(x/100, y/100)+1)/2;
+      const m = (simplex.noise2D(x/55+999, y/55+999)+1)/2;
+      let t = 2;
+      if (h < 0.30) t = 0;
+      else if (h < 0.34) t = 1;
       else {
-        if (m > 0.72 && h > 0.45) tile.type = 'forest';
-        else if (m < 0.35 && h < 0.6) tile.type = 'sand';
-        else if (h > 0.78) tile.type = 'mountain';
-        else tile.type = 'grass';
+        if (h > 0.78) t = 5;
+        else if (m > 0.68) t = 3;
+        else if (m < 0.35) t = 4;
+        else t = 2;
       }
-      // place villages and points of interest (naruto-themed)
-      if (tile.type !== 'water' && f > 0.995 && Math.random() > 0.5) {
-        tile.sub = 'village';
-      } else if (tile.type === 'mountain' && f > 0.98) {
-        tile.sub = 'cave';
-      } else if (tile.type === 'forest' && f > 0.99) {
-        tile.sub = 'shrine';
-      }
-      map[y][x] = tile;
+      map[idx(x,y)] = t;
+      tileInfo[idx(x,y)] = { x, y, type:t, npc:null, item:null };
+    }
+  }
+  for(let i=0;i<120;i++){
+    const x=Math.floor(Math.random()*WORLD_SIZE),y=Math.floor(Math.random()*WORLD_SIZE);
+    const id=idx(x,y);
+    if(map[id]!==0&&map[id]!==5){map[id]=6;tileInfo[id].type=6;}
+  }
+  for(let i=0;i<40;i++){
+    const x=Math.floor(Math.random()*WORLD_SIZE),y=Math.floor(Math.random()*WORLD_SIZE);
+    const id=idx(x,y);
+    if(map[id]!==0&&map[id]!==5&&map[id]!==6){map[id]=7;tileInfo[id].type=7;}
+  }
+}
+
+/* ================== NPCs ================== */
+const NPCS=[];
+function spawnNPCs(count){
+  let tries=0;
+  while(NPCS.length<count && tries<count*200){
+    tries++;
+    const x=Math.floor(Math.random()*WORLD_SIZE),y=Math.floor(Math.random()*WORLD_SIZE);
+    const t=map[idx(x,y)];
+    if(t!==0&&t!==5){
+      const type=Math.random()<0.7?'villager':'bandit';
+      const npc={id:NPCS.length,x,y,type,tick:0};
+      NPCS.push(npc);
+      tileInfo[idx(x,y)].npc=npc.id;
     }
   }
 }
-assignTiles();
 
-/* Add named regions (approximate) using rough rectangles */
-const regions = [
-  {name:'Land of Fire', x1:150, y1:180, x2:330, y2:360, color:'#2f5b1a'},
-  {name:'Land of Water', x1:340, y1:40, x2:499, y2:200, color:'#1b6ea8'},
-  {name:'Land of Wind', x1:10, y1:330, x2:140, y2:490, color:'#c89c52'},
-  {name:'Land of Lightning', x1:360, y1:0, x2:499, y2:40, color:'#8393c6'},
-  {name:'Land of Earth', x1:0, y1:0, x2:120, y2:140, color:'#9a7f4d'},
-];
+/* ================== RENDER ================== */
+const canvas=document.getElementById('canvas'),ctx=canvas.getContext('2d');
+const minimap=document.getElementById('minimap'),mctx=minimap.getContext('2d');
+canvas.width=960;canvas.height=640;
+let player={x:250,y:250,moving:false,from:null,to:null,t:0};
+let viewW=Math.floor(canvas.width/TILE_PX),viewH=Math.floor(canvas.height/TILE_PX);
+let camera={x:player.x-Math.floor(viewW/2),y:player.y-Math.floor(viewH/2)};
+function clampCamera(){camera.x=Math.max(0,Math.min(WORLD_SIZE-viewW,player.x-Math.floor(viewW/2)));camera.y=Math.max(0,Math.min(WORLD_SIZE-viewH,player.y-Math.floor(viewH/2)));}
 
-/* ==== Rendering ==== */
-const canvas = document.getElementById('canvas');
-const ctx = canvas.getContext('2d');
-const minimap = document.getElementById('minimap');
-const mctx = minimap.getContext('2d');
-
-let scale = 4; // pixels per tile on main canvas (rendered scaled)
-let viewW = Math.floor(CANVAS_W / scale);
-let viewH = Math.floor(CANVAS_H / scale);
-
-let player = { x: Math.floor(WORLD_SIZE/2), y: Math.floor(WORLD_SIZE/2) };
-let camera = { x: player.x - Math.floor(viewW/2), y: player.y - Math.floor(viewH/2) };
-
-/* clamp camera */
-function clampCamera() {
-  camera.x = Math.max(0, Math.min(WORLD_SIZE - viewW, player.x - Math.floor(viewW/2)));
-  camera.y = Math.max(0, Math.min(WORLD_SIZE - viewH, player.y - Math.floor(viewH/2)));
+function terrainColor(t){
+  return ['#006b8f','#f5d186','#44b058','#26713d','#e3c07b','#7b6550','#c87d28','#e8c53a'][t]||'#444';
 }
 
-/* palette */
-function terrainColor(t) {
-  switch(t){
-    case 'water': return '#0e4f6a';
-    case 'beach': return '#e9cf76';
-    case 'sand': return '#d9b38c';
-    case 'forest': return '#2e6b34';
-    case 'mountain': return '#6b5848';
-    case 'grass': default: return '#4aa04a';
+function draw(){clampCamera();ctx.clearRect(0,0,960,640);
+  const startX=camera.x,startY=camera.y;
+  for(let y=0;y<viewH;y++)for(let x=0;x<viewW;x++){
+    const wx=startX+x,wy=startY+y,sx=x*TILE_PX,sy=y*TILE_PX;
+    if(wx<0||wy<0||wx>=WORLD_SIZE||wy>=WORLD_SIZE){ctx.fillStyle='#000';ctx.fillRect(sx,sy,TILE_PX,TILE_PX);continue;}
+    const tile=tileInfo[idx(wx,wy)];
+    ctx.fillStyle=terrainColor(tile.type);ctx.fillRect(sx,sy,TILE_PX,TILE_PX);
+    ctx.strokeStyle='rgba(0,0,0,0.12)';ctx.strokeRect(sx+0.5,sy+0.5,TILE_PX-1,TILE_PX-1);
+    if(tile.type===6){ctx.fillStyle='#ffd6a5';ctx.fillRect(sx+TILE_PX/4,sy+TILE_PX/4,TILE_PX/2,TILE_PX/2);}
+    else if(tile.type===7){ctx.fillStyle='#fff2a6';ctx.beginPath();ctx.arc(sx+TILE_PX/2,sy+TILE_PX/2,TILE_PX/6,0,2*Math.PI);ctx.fill();}
   }
-}
-
-/* draw small textured tile */
-function drawTile(x,y,tile, sx, sy) {
-  ctx.fillStyle = terrainColor(tile.type);
-  ctx.fillRect(sx, sy, scale, scale);
-  // small texture accents
-  if (tile.type === 'forest' && Math.random() < 0.08) {
-    ctx.fillStyle = '#1b3f1a';
-    ctx.fillRect(sx + ( (x+y) % scale), sy + ((x*2+y) % scale), 1, 1);
-  }
-  if (tile.type === 'water') {
-    ctx.fillStyle = 'rgba(255,255,255,0.06)';
-    ctx.fillRect(sx, sy, scale, Math.max(1, Math.floor(scale/6)));
-  }
-  if (tile.sub === 'village') {
-    ctx.fillStyle = '#f6d365';
-    ctx.fillRect(sx + Math.floor(scale/4), sy + Math.floor(scale/4), Math.max(1, Math.floor(scale/2)), Math.max(1, Math.floor(scale/2)));
-  }
-  if (tile.sub === 'cave') {
-    ctx.fillStyle = '#222';
-    ctx.fillRect(sx + Math.floor(scale/3), sy + Math.floor(scale/3), Math.max(1, Math.floor(scale/3)), Math.max(1, Math.floor(scale/3)));
-  }
-  if (tile.sub === 'shrine') {
-    ctx.fillStyle = '#ffd166';
-    ctx.fillRect(sx + Math.floor(scale/3), sy + Math.floor(scale/3), Math.max(1, Math.floor(scale/3)), Math.max(1, Math.floor(scale/3)));
-  }
-}
-
-/* draw region overlay labels */
-function drawRegionLabels() {
-  ctx.font = "18px serif";
-  ctx.fillStyle = 'rgba(0,0,0,0.5)';
-  ctx.textAlign = 'center';
-  regions.forEach(r=>{
-    const cx = Math.floor((r.x1 + r.x2)/2), cy = Math.floor((r.y1 + r.y2)/2);
-    const sx = (cx - camera.x) * scale + scale/2;
-    const sy = (cy - camera.y) * scale + scale/2;
-    if (sx > -100 && sx < CANVAS_W + 100 && sy > -100 && sy < CANVAS_H + 100) {
-      ctx.fillStyle = 'rgba(0,0,0,0.6)';
-      ctx.fillText(r.name, sx+1, sy+1);
-      ctx.fillStyle = r.color;
-      ctx.fillText(r.name, sx, sy);
-    }
-  });
-}
-
-/* main draw function */
-function draw() {
-  ctx.clearRect(0,0,CANVAS_W, CANVAS_H);
-  // draw tiles in view
-  for(let y=0;y<viewH;y++){
-    for(let x=0;x<viewW;x++){
-      const wx = camera.x + x, wy = camera.y + y;
-      if (wx < 0 || wy < 0 || wx >= WORLD_SIZE || wy >= WORLD_SIZE) {
-        ctx.fillStyle = '#000';
-        ctx.fillRect(x*scale, y*scale, scale, scale);
-        continue;
-      }
-      drawTile(wx, wy, map[wy][wx], x*scale, y*scale);
-    }
-  }
-  // draw player center marker
-  const pcx = Math.floor((player.x - camera.x) * scale + scale/2);
-  const pcy = Math.floor((player.y - camera.y) * scale + scale/2);
-  ctx.beginPath();
-  ctx.fillStyle = '#ff6b6b';
-  ctx.arc(pcx, pcy, Math.max(2, scale*0.9), 0, Math.PI*2);
-  ctx.fill();
-  // draw region labels
-  drawRegionLabels();
-  // draw slight vignette & border
-  ctx.strokeStyle = 'rgba(0,0,0,0.6)';
-  ctx.lineWidth = 3;
-  ctx.strokeRect(0.5,0.5,CANVAS_W-1,CANVAS_H-1);
-  // minimap update
-  drawMinimap();
-}
-
-/* draw minimap (scaled down) */
-function drawMinimap() {
-  const mmW = minimap.width, mmH = minimap.height;
-  mctx.clearRect(0,0,mmW,mmH);
-  const sx = Math.floor(mmW / WORLD_SIZE), sy = Math.floor(mmH / WORLD_SIZE);
-  // draw coarse blocks for performance
-  const step = Math.max(1, Math.floor(WORLD_SIZE / mmW));
-  for(let y=0;y<WORLD_SIZE;y+=step){
-    for(let x=0;x<WORLD_SIZE;x+=step){
-      const tile = map[y][x];
-      mctx.fillStyle = terrainColor(tile.type);
-      mctx.fillRect(Math.floor(x / WORLD_SIZE * mmW), Math.floor(y / WORLD_SIZE * mmH), Math.ceil(mmW / (WORLD_SIZE/step)), Math.ceil(mmH / (WORLD_SIZE/step)));
-    }
-  }
-  // player marker
-  mctx.fillStyle = '#ff6b6b';
-  const px = Math.floor(player.x / WORLD_SIZE * mmW), py = Math.floor(player.y / WORLD_SIZE * mmH);
-  mctx.fillRect(px-1, py-1, 3, 3);
-}
-
-/* ==== Controls & Movement ==== */
-const keys = {};
-window.addEventListener('keydown', (e)=>{
-  keys[e.key.toLowerCase()] = true;
-  e.preventDefault();
-});
-window.addEventListener('keyup', (e)=>{
-  keys[e.key.toLowerCase()] = false;
-});
-
-function stepMovement() {
-  let mx=0,my=0;
-  if (keys['w'] || keys['arrowup']) my -= 1;
-  if (keys['s'] || keys['arrowdown']) my += 1;
-  if (keys['a'] || keys['arrowleft']) mx -= 1;
-  if (keys['d'] || keys['arrowright']) mx += 1;
-  if (mx !== 0 || my !== 0) {
-    // move player but keep inside bounds
-    player.x = Math.max(0, Math.min(WORLD_SIZE-1, player.x + mx));
-    player.y = Math.max(0, Math.min(WORLD_SIZE-1, player.y + my));
-    clampCamera();
-  }
-}
-
-/* UI buttons */
-document.getElementById('up').addEventListener('mousedown', ()=>{ keys['arrowup']=true });
-document.getElementById('up').addEventListener('mouseup', ()=>{ keys['arrowup']=false });
-document.getElementById('down').addEventListener('mousedown', ()=>{ keys['arrowdown']=true });
-document.getElementById('down').addEventListener('mouseup', ()=>{ keys['arrowdown']=false });
-document.getElementById('left').addEventListener('mousedown', ()=>{ keys['arrowleft']=true });
-document.getElementById('left').addEventListener('mouseup', ()=>{ keys['arrowleft']=false });
-document.getElementById('right').addEventListener('mousedown', ()=>{ keys['arrowright']=true });
-document.getElementById('right').addEventListener('mouseup', ()=>{ keys['arrowright']=false });
-
-/* click to teleport for quick demo */
-canvas.addEventListener('click', (e)=>{
-  const rect = canvas.getBoundingClientRect();
-  const cx = e.clientX - rect.left, cy = e.clientY - rect.top;
-  const tileX = camera.x + Math.floor(cx / scale), tileY = camera.y + Math.floor(cy / scale);
-  player.x = Math.max(0, Math.min(WORLD_SIZE-1, tileX)); player.y = Math.max(0, Math.min(WORLD_SIZE-1, tileY));
-  clampCamera();
-  draw();
-});
-
-/* responsive scaling: adjust viewW/viewH based on scale & canvas */
-function updateView() {
-  viewW = Math.floor(CANVAS_W / scale);
-  viewH = Math.floor(CANVAS_H / scale);
-  clampCamera();
-}
-
-/* main loop */
-function mainLoop() {
-  stepMovement();
-  draw();
-  requestAnimationFrame(mainLoop);
-}
-
-/* initialize minimap resolution */
-minimap.width = 160; minimap.height = 160;
-
-/* init camera and start */
-clampCamera();
-mainLoop();
-
+  NPCS.forEach(n=>{const relX=n.x-camera.x,relY=n.y-camera.y;if(relX>-1&&relY>-1&&relX<viewW+1&&relY<viewH+1){const px=relX*TILE_PX+TILE_PX/2,py=relY*TILE_PX+TILE_PX/2;ctx.beginPath();ctx.fillStyle=n.type==='villager'?'#ffd166':'#ff6b6b';ctx.arc(px,py,TILE_PX*0.28,0,Math.PI*2);ctx.fill();}});
+  let drawX=player.x,drawY=player.y;if(player.moving&&player.from&&player.to){const lerp=player.t/MOVE_TIME;drawX=player.from.x+(player.to.x-player.from.x)*lerp;drawY=player.from.y+(player.to.y-player.from.y)*lerp;}
+  const ppx=(drawX-camera.x)*TILE_PX+TILE_PX/2,ppy=(drawY-camera.y)*TILE_PX+TILE_PX/2;ctx.beginPath();ctx.fillStyle='#ff4d4d';ctx.arc(ppx,ppy,TILE_PX*0.36,0,Math.PI*2);ctx.fill();
+  drawHints();drawDayNight();document.getElementById('coords').innerText=`Coords: ${player.x}, ${player.y}`;document.getElementById('region').innerText=`Region: ${getRegionName(player.x,player.y)}`;drawMinimap();}
+let hintTimeout=0;
+function drawHints(){const dirOffsets=[[0,-1],[1,0],[0,1],[-1,0]];let hint='';for(const off of dirOffsets){const nx=player.x+off[0],ny=player.y+off[1];if(nx<0||ny<0||nx>=WORLD_SIZE||ny>=WORLD_SIZE)continue;const t=tileInfo[idx(nx,ny)];if(t&&t.type===7){hint='Press E to interact with Shrine';break;}if(t&&t.npc!==null){const npc=NPCS[t.npc];hint=`Press E to talk to ${npc.type}`;break;}}const dlg=document.getElementById('dialog');if(hint){dlg.style.display='block';dlg.innerText=hint;}else{dlg.style.display='none';}}
+let dayTime=0;
+function drawDayNight(){dayTime=((performance.now()/1000)%DAY_LENGTH_SECONDS)/DAY_LENGTH_SECONDS;const cycle=(dayTime+0.25)%1;let r=0,g=0,b=0,a=0;if(cycle<0.25){a=0.25*(cycle/0.25);r=40;g=20;}else if(cycle<0.5){a=0;}else if(cycle<0.75){a=0.35*((cycle-0.5)/0.25);r=30;g=12;}else{a=0.45*((cycle-0.75)/0.25);b=60;}if(a>0){ctx.fillStyle=`rgba(${r},${g},${b},${a})`;ctx.fillRect(0,0,960,640);}if(cycle>0.82||cycle<0.08){ctx.fillStyle='rgba(255,255,255,0.08)';for(let i=0;i<20;i++){ctx.fillRect(Math.random()*960,Math.random()*640,1,1);}}}
+function drawMinimap(){const mmW=minimap.width,mmH=minimap.height;mctx.clearRect(0,0,mmW,mmH);const step=Math.ceil(WORLD_SIZE/mmW);for(let y=0;y<WORLD_SIZE;y+=step){for(let x=0;x<WORLD_SIZE;x+=step){const c=terrainColor(tileInfo[idx(x,y)].type);mctx.fillStyle=c;mctx.fillRect(Math.floor(x/WORLD_SIZE*mmW),Math.floor(y/WORLD_SIZE*mmH),Math.ceil(mmW/(WORLD_SIZE/step)),Math.ceil(mmH/(WORLD_SIZE/step)));}}mctx.fillStyle='#ff4d4d';mctx.fillRect(Math.floor(player.x/WORLD_SIZE*mmW)-1,Math.floor(player.y/WORLD_SIZE*mmH)-1,3,3);}
+const keys={};window.addEventListener('keydown',e=>{if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','w','a','s','d','E','e'].includes(e.key)){keys[e.key]=true;e.preventDefault();}});window.addEventListener('keyup',e=>{keys[e.key]=false;});
+function tryMove(dx,dy){if(player.moving)return;const tx=player.x+dx,ty=player.y+dy;if(tx<0||ty<0||tx>=WORLD_SIZE||ty>=WORLD_SIZE)return;const t=tileInfo[idx(tx,ty)];if(t.type===0||t.type===5)return;player.moving=true;player.from={x:player.x,y:player.y};player.to={x:tx,y:ty};player.t=0;player.x=tx;player.y=ty;clampCamera();if(t.npc!==null){const npc=NPCS[t.npc];if(npc.type==='bandit'){alert('A bandit attacks! (placeholder combat)');}}setTimeout(()=>{player.moving=false;player.from=null;player.to=null;player.t=0;},MOVE_TIME);}
+function processInput(){if(!player.moving){if(keys['w']||keys['ArrowUp'])tryMove(0,-1);else if(keys['s']||keys['ArrowDown'])tryMove(0,1);else if(keys['a']||keys['ArrowLeft'])tryMove(-1,0);else if(keys['d']||keys['ArrowRight'])tryMove(1,0);else if(keys['e']||keys['E'])tryInteract();}}
+function tryInteract(){const offsets=[[0,-1],[1,0],[0,1],[-1,0]];for(const off of offsets){const nx=player.x+off[0],ny=player.y+off[1];if(nx<0||ny<0||nx>=WORLD_SIZE||ny>=WORLD_SIZE)continue;const t=tileInfo[idx(nx,ny)];if(t&&t.type===7){showDialog('You collected a chakra scroll!');t.type=2;map[idx(nx,ny)]=2;return;}if(t&&t.npc!==null){const n=NPCS[t.npc];showDialog(`${n.type}: Hello traveler.`);return;}}}
+function showDialog(text){const dlg=document.getElementById('dialog');dlg.innerText=text;dlg.style.display='block';clearTimeout(hintTimeout);hintTimeout=setTimeout(()=>{dlg.style.display='none';},3500);}
+function updateNPCs(dt){NPCS.forEach(n=>{n.tick+=dt;if(n.tick>2000+Math.random()*4000){n.tick=0;const dirs=[[0,-1],[1,0],[0,1],[-1,0],[0,0]];const d=dirs[Math.floor(Math.random()*dirs.length)];const nx=n.x+d[0],ny=n.y+d[1];if(nx<0||ny<0||nx>=WORLD_SIZE||ny>=WORLD_SIZE)return;const tid=tileInfo[idx(nx,ny)];if(tid.type===0||tid.type===5)return;if(nx===player.x&&ny===player.y)return;tileInfo[idx(n.x,n.y)].npc=null;n.x=nx;n.y=ny;tileInfo[idx(n.x,n.y)].npc=n.id;}});}
+function getRegionName(x,y){if(x>WORLD_SIZE*0.6&&y>WORLD_SIZE*0.6)return'Land of Fire';if(x<WORLD_SIZE*0.2&&y<WORLD_SIZE*0.2)return'Land of Earth';if(y<WORLD_SIZE*0.3&&x>WORLD_SIZE*0.5)return'Land of Water';if(x<WORLD_SIZE*0.25&&y>WORLD_SIZE*0.6)return'Land of Wind';if(x>WORLD_SIZE*0.7&&y<WORLD_SIZE*0.15)return'Land of Lightning';return'Central Lands';}
+generateWorld();spawnNPCs(NPC_COUNT);clampCamera();
+let last=performance.now();
+function loop(now){const dt=now-last;last=now;if(player.moving&&player.from&&player.to){player.t=Math.min(MOVE_TIME,player.t+dt);}processInput();updateNPCs(dt);draw();requestAnimationFrame(loop);}
+requestAnimationFrame(loop);
+canvas.addEventListener('mousedown',e=>{e.preventDefault();});
 </script>
 </body>
 </html>
