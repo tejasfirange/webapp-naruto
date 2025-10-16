@@ -3,11 +3,11 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Naruto RPG World — Smooth Procedural Map</title>
+<title>Naruto RPG World — Rivers, Villages, Mini-Map</title>
 <style>
   body {
     margin: 0;
-    background: radial-gradient(circle at center, #0b0e13 20%, #050608);
+    background: radial-gradient(circle at center, #0b0e13 20%, #060809);
     color: white;
     font-family: "Poppins", sans-serif;
     text-align: center;
@@ -35,12 +35,12 @@
     position: absolute;
     top: 50%;
     left: 50%;
-    width: 22px;
-    height: 22px;
+    width: 20px;
+    height: 20px;
     transform: translate(-50%, -50%);
-    background: radial-gradient(circle, #00ffff, #0066ff);
-    border: 2px solid white;
+    background: radial-gradient(circle, #00ffff, #0077ff);
     border-radius: 50%;
+    border: 2px solid #fff;
     box-shadow: 0 0 15px cyan;
     animation: pulse 1s infinite alternate;
   }
@@ -79,12 +79,39 @@
     padding: 8px 15px;
     display: inline-block;
   }
+  #mini {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    border: 1px solid rgba(255,255,255,0.3);
+    border-radius: 8px;
+    background: rgba(0,0,0,0.4);
+  }
+  #zoom-controls {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+  }
+  #zoom-controls button {
+    width: 32px;
+    height: 32px;
+    font-size: 20px;
+    padding: 0;
+  }
 </style>
 </head>
 <body>
   <h1>🌏 Naruto RPG World Map</h1>
   <div id="map-container">
     <canvas id="map"></canvas>
+    <canvas id="mini" width="160" height="100"></canvas>
+    <div id="zoom-controls">
+      <button id="zoomIn">＋</button>
+      <button id="zoomOut">－</button>
+    </div>
     <div class="player"></div>
   </div>
 
@@ -103,24 +130,33 @@
   </div>
 
 <script>
+// === Canvas Setup ===
 const canvas = document.getElementById("map");
 const ctx = canvas.getContext("2d");
+const mini = document.getElementById("mini");
+const mctx = mini.getContext("2d");
 let w, h;
-let playerX = 0, playerY = 0;
-const tileSize = 2.5; // smooth pixels
-const zoom = 0.015; // noise scale
 
-// Resize canvas
+let playerX = 0, playerY = 0;
+let zoom = 0.015;
+let scale = 1.0;
+const villages = [
+  { x: 50, y: 20, color: "#00ff88", name: "Konoha" },
+  { x: -90, y: 40, color: "#ffd75e", name: "Sunagakure" },
+  { x: 20, y: 110, color: "#66ccff", name: "Kirigakure" },
+  { x: 130, y: -50, color: "#dddddd", name: "Kumogakure" },
+  { x: -110, y: -70, color: "#ff6666", name: "Iwagakure" },
+];
+
 function resize() {
   canvas.width = canvas.clientWidth;
   canvas.height = canvas.clientHeight;
-  w = canvas.width;
-  h = canvas.height;
+  w = canvas.width; h = canvas.height;
   drawWorld();
 }
 window.addEventListener("resize", resize);
 
-// --- Smoothed Noise ---
+// === Optimized Fractal Noise ===
 function noise(x, y) {
   const n = Math.sin(x * 127.1 + y * 311.7) * 43758.5453;
   return n - Math.floor(n);
@@ -149,84 +185,135 @@ function fractalNoise(x, y) {
   return total / max;
 }
 
-// --- Draw Smooth Terrain ---
+// === Draw World ===
 function drawWorld() {
-  const img = ctx.createImageData(w, h);
+  const offCanvas = document.createElement("canvas");
+  const offCtx = offCanvas.getContext("2d");
+  offCanvas.width = w / 2; // half res for performance
+  offCanvas.height = h / 2;
+  const img = offCtx.createImageData(offCanvas.width, offCanvas.height);
   const data = img.data;
 
-  for (let y = 0; y < h; y++) {
-    for (let x = 0; x < w; x++) {
-      const worldX = (x - w / 2) * zoom + playerX * zoom * 30;
-      const worldY = (y - h / 2) * zoom + playerY * zoom * 30;
-
+  for (let y = 0; y < offCanvas.height; y++) {
+    for (let x = 0; x < offCanvas.width; x++) {
+      const worldX = (x - offCanvas.width / 2) * zoom / scale + playerX * 0.05;
+      const worldY = (y - offCanvas.height / 2) * zoom / scale + playerY * 0.05;
       const elevation = fractalNoise(worldX, worldY);
       const moisture = fractalNoise(worldX + 100, worldY - 100);
 
       let r, g, b;
-      if (elevation < 0.3) {           // water
-        r = 20; g = 90; b = 180;
-      } else if (elevation < 0.36) {   // beach
-        r = 222; g = 202; b = 118;
-      } else if (elevation < 0.55) {   // grass
-        r = 65; g = 170; b = 70;
-      } else if (elevation < 0.7) {    // forest
-        r = 40; g = 120; b = 40;
-      } else if (elevation < 0.85) {   // hills
-        r = 110; g = 90; b = 60;
-      } else {                         // mountains
-        r = 160; g = 160; b = 160;
+
+      // --- Elevation to biome ---
+      if (elevation < 0.28) { // deep water
+        r=20; g=60; b=130;
+      } else if (elevation < 0.32) { // river/lake
+        r=25; g=80; b=180;
+      } else if (elevation < 0.37) { // sand
+        r=220; g=200; b=120;
+      } else if (elevation < 0.55) { // plains
+        r=70; g=180; b=80;
+      } else if (elevation < 0.7) { // forest
+        r=40; g=120; b=60;
+      } else if (elevation < 0.85) { // highlands
+        r=110; g=90; b=60;
+      } else { // mountains
+        r=170; g=170; b=170;
       }
 
-      const index = (x + y * w) * 4;
-      data[index] = r;
-      data[index + 1] = g;
-      data[index + 2] = b;
-      data[index + 3] = 255;
+      const idx = (x + y * offCanvas.width) * 4;
+      data[idx] = r; data[idx+1] = g; data[idx+2] = b; data[idx+3] = 255;
     }
   }
-  ctx.putImageData(img, 0, 0);
+  offCtx.putImageData(img, 0, 0);
+  ctx.imageSmoothingEnabled = true;
+  ctx.drawImage(offCanvas, 0, 0, w, h);
 
-  // Add light fog overlay
-  const gradient = ctx.createRadialGradient(w/2, h/2, h/4, w/2, h/2, h/1.2);
-  gradient.addColorStop(0, "rgba(0,0,0,0)");
-  gradient.addColorStop(1, "rgba(0,0,0,0.7)");
-  ctx.fillStyle = gradient;
-  ctx.fillRect(0, 0, w, h);
+  // --- Villages ---
+  for (const v of villages) {
+    const dx = w/2 + (v.x - playerX) * 6 * scale;
+    const dy = h/2 + (v.y - playerY) * 6 * scale;
+    if (dx < -30 || dx > w+30 || dy < -30 || dy > h+30) continue;
+    ctx.beginPath();
+    ctx.arc(dx, dy, 8, 0, 2*Math.PI);
+    ctx.fillStyle = v.color;
+    ctx.shadowBlur = 10;
+    ctx.shadowColor = v.color;
+    ctx.fill();
+    ctx.shadowBlur = 0;
+    ctx.font = "12px Poppins";
+    ctx.fillStyle = "#fff";
+    ctx.fillText(v.name, dx - 20, dy - 12);
+  }
 
+  // --- Light fog gradient ---
+  const grad = ctx.createRadialGradient(w/2,h/2,h/4,w/2,h/2,h/1.2);
+  grad.addColorStop(0,"rgba(0,0,0,0)");
+  grad.addColorStop(1,"rgba(0,0,0,0.7)");
+  ctx.fillStyle = grad;
+  ctx.fillRect(0,0,w,h);
+
+  drawMiniMap();
   updateInfo();
 }
 
-function updateInfo() {
-  const e = fractalNoise(playerX * zoom * 30, playerY * zoom * 30);
-  let region = "Unknown";
-  if (e < 0.3) region = "Ocean";
-  else if (e < 0.36) region = "Beach";
-  else if (e < 0.55) region = "Grasslands";
-  else if (e < 0.7) region = "Forest";
-  else if (e < 0.85) region = "Highlands";
-  else region = "Mountains";
+// === Mini Map ===
+function drawMiniMap(){
+  mctx.clearRect(0,0,mini.width,mini.height);
+  mctx.fillStyle="#0a1a2a";
+  mctx.fillRect(0,0,mini.width,mini.height);
 
-  document.getElementById("region").textContent = "Region: " + region;
-  document.getElementById("chunk").textContent = `Chunk: ${playerX}, ${playerY}`;
+  // Villages
+  for(const v of villages){
+    const mx = mini.width/2 + (v.x - playerX)/2;
+    const my = mini.height/2 + (v.y - playerY)/2;
+    mctx.fillStyle = v.color;
+    mctx.beginPath();
+    mctx.arc(mx,my,3,0,2*Math.PI);
+    mctx.fill();
+  }
+
+  // Player
+  mctx.fillStyle="#00ffff";
+  mctx.beginPath();
+  mctx.arc(mini.width/2, mini.height/2, 3, 0, 2*Math.PI);
+  mctx.fill();
 }
 
-function move(dx, dy) {
+// === Info ===
+function updateInfo(){
+  const e = fractalNoise(playerX*0.05, playerY*0.05);
+  let region;
+  if (e < 0.3) region="Ocean";
+  else if (e < 0.37) region="Coast";
+  else if (e < 0.55) region="Grasslands";
+  else if (e < 0.7) region="Forest";
+  else if (e < 0.85) region="Highlands";
+  else region="Mountains";
+
+  document.getElementById("region").textContent=`Region: ${region}`;
+  document.getElementById("chunk").textContent=`Chunk: ${playerX}, ${playerY}`;
+}
+
+// === Movement ===
+function move(dx, dy){
   playerX += dx;
   playerY += dy;
   drawWorld();
 }
-
-document.getElementById("up").onclick = () => move(0, -1);
-document.getElementById("down").onclick = () => move(0, 1);
-document.getElementById("left").onclick = () => move(-1, 0);
-document.getElementById("right").onclick = () => move(1, 0);
-
-window.addEventListener("keydown", (e) => {
-  if (["ArrowUp", "w", "W"].includes(e.key)) move(0, -1);
-  if (["ArrowDown", "s", "S"].includes(e.key)) move(0, 1);
-  if (["ArrowLeft", "a", "A"].includes(e.key)) move(-1, 0);
-  if (["ArrowRight", "d", "D"].includes(e.key)) move(1, 0);
+document.getElementById("up").onclick=()=>move(0,-1);
+document.getElementById("down").onclick=()=>move(0,1);
+document.getElementById("left").onclick=()=>move(-1,0);
+document.getElementById("right").onclick=()=>move(1,0);
+window.addEventListener("keydown",e=>{
+  if(["ArrowUp","w","W"].includes(e.key))move(0,-1);
+  if(["ArrowDown","s","S"].includes(e.key))move(0,1);
+  if(["ArrowLeft","a","A"].includes(e.key))move(-1,0);
+  if(["ArrowRight","d","D"].includes(e.key))move(1,0);
 });
+
+// === Zoom ===
+document.getElementById("zoomIn").onclick=()=>{ scale*=1.2; drawWorld(); };
+document.getElementById("zoomOut").onclick=()=>{ scale/=1.2; drawWorld(); };
 
 resize();
 </script>
