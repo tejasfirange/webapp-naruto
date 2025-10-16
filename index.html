@@ -3,100 +3,86 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Naruto RPG World — Fully Generated</title>
+<title>Naruto RPG World — Smooth Procedural Map</title>
 <style>
   body {
     margin: 0;
-    overflow: hidden;
-    background: #0b0e13;
-    font-family: 'Poppins', sans-serif;
-    color: #fff;
+    background: radial-gradient(circle at center, #0b0e13 20%, #050608);
+    color: white;
+    font-family: "Poppins", sans-serif;
     text-align: center;
+    overflow: hidden;
   }
-
   h1 {
-    margin-top: 10px;
-    font-size: 1.6rem;
     text-shadow: 0 0 10px #00c8ff;
+    margin: 15px 0;
   }
-
   #map-container {
     position: relative;
     width: 90vw;
     height: 70vh;
-    margin: 10px auto;
+    margin: 0 auto;
     border-radius: 16px;
     overflow: hidden;
-    box-shadow: 0 0 30px rgba(0,0,0,0.6);
-    background: #000;
+    box-shadow: 0 0 40px rgba(0,0,0,0.6);
   }
-
   canvas {
     width: 100%;
     height: 100%;
     display: block;
   }
-
   .player {
     position: absolute;
     top: 50%;
     left: 50%;
-    width: 25px;
-    height: 25px;
-    background: radial-gradient(circle, #00eaff, #0077ff);
-    border-radius: 50%;
-    border: 2px solid white;
+    width: 22px;
+    height: 22px;
     transform: translate(-50%, -50%);
+    background: radial-gradient(circle, #00ffff, #0066ff);
+    border: 2px solid white;
+    border-radius: 50%;
     box-shadow: 0 0 15px cyan;
     animation: pulse 1s infinite alternate;
   }
-
   @keyframes pulse {
     from { transform: translate(-50%, -50%) scale(1); }
     to { transform: translate(-50%, -50%) scale(1.2); }
   }
-
   #controls {
+    margin-top: 10px;
     display: flex;
     flex-direction: column;
     align-items: center;
-    margin-top: 10px;
   }
-
   .row {
     display: flex;
-    justify-content: center;
     gap: 10px;
   }
-
   button {
-    background: rgba(0,0,0,0.5);
+    background: rgba(0,0,0,0.4);
     border: 2px solid rgba(255,255,255,0.2);
     color: white;
-    border-radius: 8px;
-    padding: 10px;
-    cursor: pointer;
+    border-radius: 10px;
     font-size: 20px;
+    padding: 10px 14px;
+    cursor: pointer;
     transition: 0.2s;
   }
-
   button:hover {
     background: rgba(0,255,255,0.2);
     box-shadow: 0 0 10px #00ffff;
   }
-
   #info {
     margin-top: 10px;
-    font-size: 14px;
     background: rgba(0,0,0,0.5);
-    padding: 10px 15px;
     border-radius: 10px;
+    padding: 8px 15px;
     display: inline-block;
   }
 </style>
 </head>
 <body>
-  <h1>🌎 Naruto RPG World Map</h1>
+  <h1>🌏 Naruto RPG World Map</h1>
   <div id="map-container">
     <canvas id="map"></canvas>
     <div class="player"></div>
@@ -119,34 +105,43 @@
 <script>
 const canvas = document.getElementById("map");
 const ctx = canvas.getContext("2d");
-
-let width, height;
+let w, h;
 let playerX = 0, playerY = 0;
-let tileSize = 40;
-const viewRadius = 15;
+const tileSize = 2.5; // smooth pixels
+const zoom = 0.015; // noise scale
 
-// resize canvas
+// Resize canvas
 function resize() {
   canvas.width = canvas.clientWidth;
   canvas.height = canvas.clientHeight;
-  width = canvas.width;
-  height = canvas.height;
-  drawMap();
+  w = canvas.width;
+  h = canvas.height;
+  drawWorld();
 }
-
 window.addEventListener("resize", resize);
 
-// smooth noise generator
+// --- Smoothed Noise ---
 function noise(x, y) {
-  const n = Math.sin(x * 12.9898 + y * 78.233) * 43758.5453;
+  const n = Math.sin(x * 127.1 + y * 311.7) * 43758.5453;
   return n - Math.floor(n);
 }
-
-// combined fractal noise
+function smoothNoise(x, y) {
+  const iX = Math.floor(x);
+  const iY = Math.floor(y);
+  const fX = x - iX;
+  const fY = y - iY;
+  const a = noise(iX, iY);
+  const b = noise(iX + 1, iY);
+  const c = noise(iX, iY + 1);
+  const d = noise(iX + 1, iY + 1);
+  const u = fX * fX * (3 - 2 * fX);
+  const v = fY * fY * (3 - 2 * fY);
+  return a * (1 - u) * (1 - v) + b * u * (1 - v) + c * (1 - u) * v + d * u * v;
+}
 function fractalNoise(x, y) {
-  let total = 0, freq = 0.05, amp = 1, max = 0;
+  let total = 0, freq = 1, amp = 1, max = 0;
   for (let i = 0; i < 5; i++) {
-    total += noise(x * freq, y * freq) * amp;
+    total += smoothNoise(x * freq, y * freq) * amp;
     max += amp;
     amp *= 0.5;
     freq *= 2;
@@ -154,70 +149,71 @@ function fractalNoise(x, y) {
   return total / max;
 }
 
-// biome color generator
-function getBiomeColor(x, y) {
-  const elevation = fractalNoise(x, y);
-  const moisture = fractalNoise(x + 100, y - 100);
+// --- Draw Smooth Terrain ---
+function drawWorld() {
+  const img = ctx.createImageData(w, h);
+  const data = img.data;
 
-  if (elevation < 0.3) {
-    return { color: "#1565c0", name: "Ocean" }; // deep blue
-  } else if (elevation < 0.38) {
-    return { color: "#f2d16b", name: "Beach" }; // sand
-  } else if (elevation < 0.6) {
-    if (moisture > 0.5) return { color: "#3ba045", name: "Forest" };
-    return { color: "#7ac142", name: "Grassland" };
-  } else if (elevation < 0.75) {
-    return { color: "#a67c52", name: "Highlands" };
-  } else {
-    return { color: "#8b8b8b", name: "Mountains" };
-  }
-}
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const worldX = (x - w / 2) * zoom + playerX * zoom * 30;
+      const worldY = (y - h / 2) * zoom + playerY * zoom * 30;
 
-// draw world tiles
-function drawMap() {
-  ctx.clearRect(0, 0, width, height);
-  const cols = Math.ceil(width / tileSize);
-  const rows = Math.ceil(height / tileSize);
-  const offsetX = playerX * tileSize;
-  const offsetY = playerY * tileSize;
-  const startX = -Math.floor(cols / 2);
-  const startY = -Math.floor(rows / 2);
+      const elevation = fractalNoise(worldX, worldY);
+      const moisture = fractalNoise(worldX + 100, worldY - 100);
 
-  for (let y = startY; y < startY + rows; y++) {
-    for (let x = startX; x < startX + cols; x++) {
-      const gx = x + playerX;
-      const gy = y + playerY;
-      const biome = getBiomeColor(gx, gy);
-      const px = (x - startX) * tileSize;
-      const py = (y - startY) * tileSize;
+      let r, g, b;
+      if (elevation < 0.3) {           // water
+        r = 20; g = 90; b = 180;
+      } else if (elevation < 0.36) {   // beach
+        r = 222; g = 202; b = 118;
+      } else if (elevation < 0.55) {   // grass
+        r = 65; g = 170; b = 70;
+      } else if (elevation < 0.7) {    // forest
+        r = 40; g = 120; b = 40;
+      } else if (elevation < 0.85) {   // hills
+        r = 110; g = 90; b = 60;
+      } else {                         // mountains
+        r = 160; g = 160; b = 160;
+      }
 
-      ctx.fillStyle = biome.color;
-      ctx.fillRect(px, py, tileSize, tileSize);
+      const index = (x + y * w) * 4;
+      data[index] = r;
+      data[index + 1] = g;
+      data[index + 2] = b;
+      data[index + 3] = 255;
     }
   }
+  ctx.putImageData(img, 0, 0);
 
-  // overlay smooth vignette for depth
-  const grad = ctx.createRadialGradient(width / 2, height / 2, width / 6, width / 2, height / 2, width / 1.2);
-  grad.addColorStop(0, "rgba(0,0,0,0)");
-  grad.addColorStop(1, "rgba(0,0,0,0.6)");
-  ctx.fillStyle = grad;
-  ctx.fillRect(0, 0, width, height);
+  // Add light fog overlay
+  const gradient = ctx.createRadialGradient(w/2, h/2, h/4, w/2, h/2, h/1.2);
+  gradient.addColorStop(0, "rgba(0,0,0,0)");
+  gradient.addColorStop(1, "rgba(0,0,0,0.7)");
+  ctx.fillStyle = gradient;
+  ctx.fillRect(0, 0, w, h);
 
   updateInfo();
 }
 
-// info panel
 function updateInfo() {
-  const biome = getBiomeColor(playerX, playerY);
-  document.getElementById("region").textContent = `Region: ${biome.name}`;
+  const e = fractalNoise(playerX * zoom * 30, playerY * zoom * 30);
+  let region = "Unknown";
+  if (e < 0.3) region = "Ocean";
+  else if (e < 0.36) region = "Beach";
+  else if (e < 0.55) region = "Grasslands";
+  else if (e < 0.7) region = "Forest";
+  else if (e < 0.85) region = "Highlands";
+  else region = "Mountains";
+
+  document.getElementById("region").textContent = "Region: " + region;
   document.getElementById("chunk").textContent = `Chunk: ${playerX}, ${playerY}`;
 }
 
-// move & redraw
 function move(dx, dy) {
   playerX += dx;
   playerY += dy;
-  drawMap();
+  drawWorld();
 }
 
 document.getElementById("up").onclick = () => move(0, -1);
@@ -225,7 +221,7 @@ document.getElementById("down").onclick = () => move(0, 1);
 document.getElementById("left").onclick = () => move(-1, 0);
 document.getElementById("right").onclick = () => move(1, 0);
 
-window.addEventListener("keydown", e => {
+window.addEventListener("keydown", (e) => {
   if (["ArrowUp", "w", "W"].includes(e.key)) move(0, -1);
   if (["ArrowDown", "s", "S"].includes(e.key)) move(0, 1);
   if (["ArrowLeft", "a", "A"].includes(e.key)) move(-1, 0);
