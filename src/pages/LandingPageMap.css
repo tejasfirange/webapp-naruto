@@ -2,50 +2,48 @@
   width: 100vw;
   height: 100vh;
   overflow: hidden;
+  background: #000;
   position: relative;
-  background: #0d0d0d;
 }
 
 .map {
   position: absolute;
-  width: max-content;
-  height: max-content;
-  transition: transform 0.15s ease-out;
+  transition: transform 0.2s ease-out;
 }
 
 .tile {
-  position: absolute;
   width: 32px;
   height: 32px;
-  box-shadow: inset 0 0 1px rgba(0, 0, 0, 0.4);
+  position: absolute;
+  box-shadow: inset 0 0 1px rgba(0,0,0,0.3);
 }
 
-/* 🏞️ Biome Styles */
+/* 🌿 Regions */
 .tile.grass {
-  background: linear-gradient(135deg, #4caf50, #2e7d32);
+  background: linear-gradient(135deg,#6ac05d 0%,#377b36 100%);
 }
 .tile.forest {
-  background: radial-gradient(circle at 30% 30%, #1b5e20, #0d4d10);
+  background: radial-gradient(circle at 40% 40%,#1c5e20 0%,#093c10 100%);
 }
 .tile.sand {
-  background: linear-gradient(135deg, #e6d480, #d4b060);
+  background: linear-gradient(135deg,#f1d07b 0%,#e0b860 100%);
 }
 .tile.water {
-  background: linear-gradient(135deg, #4fa3f7, #0077c8);
+  background: radial-gradient(circle at 30% 30%,#2b6fc1 0%,#003d80 100%);
 }
 .tile.mountain {
-  background: linear-gradient(135deg, #9e9e9e, #5e5e5e);
+  background: linear-gradient(135deg,#9e9e9e 0%,#5c5c5c 100%);
 }
 .tile.snow {
-  background: linear-gradient(135deg, #eaeaea, #cfd8dc);
+  background: linear-gradient(135deg,#f5f5f5 0%,#d0e0f0 100%);
 }
 
 /* 👣 Player */
 .tile.player {
-  border: 2px solid white;
+  background: radial-gradient(circle,#ff4343 0%,#a60000 90%);
+  border: 2px solid #fff;
   border-radius: 50%;
-  background: radial-gradient(circle, #ff4b4b 0%, #c21807 90%);
-  z-index: 5;
+  z-index: 10;
 }
 
 /* 🎮 Controls */
@@ -55,21 +53,20 @@
   left: 40px;
   display: flex;
   flex-direction: column;
-  gap: 6px;
   align-items: center;
-  z-index: 10;
+  gap: 4px;
+  z-index: 50;
 }
-
 .controls button {
-  width: 40px;
-  height: 40px;
+  width: 38px;
+  height: 38px;
   border-radius: 8px;
   background: #263238;
-  color: white;
-  font-size: 18px;
+  color: #fff;
   border: none;
+  font-size: 18px;
   cursor: pointer;
-  transition: background 0.15s;
+  transition: 0.15s;
 }
 .controls button:hover {
   background: #37474f;
