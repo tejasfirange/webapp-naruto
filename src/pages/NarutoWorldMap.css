@@ -1,6 +1,5 @@
-/* NarutoWorldMap.css - minimal UI & centered bottom arrows */
+/* NarutoWorldMap.css - dual-layer style (base texture + grid overlay) */
 
-/* Layout root */
 .naruto-map-root {
   width: 100vw;
   height: 100vh;
@@ -14,7 +13,6 @@
   padding: 18px;
 }
 
-/* left area contains viewport and controls */
 .naruto-map-left {
   display: flex;
   flex-direction: column;
@@ -23,7 +21,6 @@
   justify-content: center;
 }
 
-/* viewport wrapper to position centered arrows overlay */
 .viewport-wrap {
   position: relative;
   border-radius: 10px;
@@ -32,10 +29,9 @@
   overflow: hidden;
 }
 
-/* main canvas will be sized via JS; ensure it fills the wrapper */
 .main-canvas {
   display: block;
-  width: 820px; /* default CSS size - will be overridden by inline styles from component */
+  width: 820px; /* will be overwritten by JS sizing */
   height: 640px;
   background: #071018;
   border-radius: 8px;
