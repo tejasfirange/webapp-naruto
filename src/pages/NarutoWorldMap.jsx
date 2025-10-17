@@ -2,136 +2,179 @@ import React, { useEffect, useRef, useState } from "react";
 import "./NarutoWorldMap.css";
 
 /**
- * NarutoWorldMap (dual-layer) - React component
- * GRID_SIZE: 1000 x 1000 logical tiles
+ * NarutoWorldMap.jsx
+ * - GRID_SIZE = 500 (500x500 tiles)
+ * - Player moves by tile, holds repeat at 100ms
+ * - Zoom fixed so player tile -> screen mapping stable (no drift)
+ * - Chunk overlay toggle (16x16)
  *
- * How it works (summary):
- * - Loads the full reference image (village_map.jpg).
- * - For each frame, calculates how many logical tiles fit in viewport given tileDisplayPx and zoom.
- * - Computes a source rectangle in the image (in image pixels) centered around the player.
- * - drawImage that source rect stretched to the viewport (so the base texture is crisp/readable).
- * - Draw a grid overlay on top (tile borders) using tileDisplayPx * zoom spacing.
- * - Player marker is always drawn centered.
- * - Minimap draws whole image scaled + a yellow viewport rect.
+ * Put your reference image at: public/village_map.jpg
  */
 
 export default function NarutoWorldMap() {
   const IMAGE_PATH = "/village_map.jpg";
-  const GRID_SIZE = 1000;
-  const BASE_TILE_PX = 6; // base visual size for 1 tile at zoom=1 (tweakable)
+  const GRID_SIZE = 500;
+  const BASE_TILE_PX = 6;    // base tile display size (zoom=1)
   const MIN_ZOOM = 0.3;
   const MAX_ZOOM = 4;
+  const HOLD_INTERVAL_MS = 100;
+  const CHUNK_SIZE = 16;
 
   const canvasRef = useRef(null);
   const miniRef = useRef(null);
   const imgRef = useRef(null);
-  const rafRef = useRef(null);
 
+  // state
   const [loaded, setLoaded] = useState(false);
   const [player, setPlayer] = useState({ x: Math.floor(GRID_SIZE / 2), y: Math.floor(GRID_SIZE / 2) });
   const [zoom, setZoom] = useState(1);
-  const [tilePx, setTilePx] = useState(BASE_TILE_PX); // displayed tile size (before zoom)
-  const [imgSize, setImgSize] = useState({ w: 0, h: 0 });
+  const [chunkOverlay, setChunkOverlay] = useState(false);
 
-  // Load image
+  // hold-to-move control
+  const holdRef = useRef({ dir: null, timer: null });
+
+  // load image
   useEffect(() => {
     const img = new Image();
     img.crossOrigin = "anonymous";
     img.src = IMAGE_PATH + "?_=" + Date.now();
     img.onload = () => {
       imgRef.current = img;
-      setImgSize({ w: img.width, h: img.height });
       setLoaded(true);
-      // initial draw
-      requestAnimationFrame(drawFrame);
-      drawMinimap(img);
+      drawAll(img, player, zoom, chunkOverlay);
+      drawMinimap(img, player, zoom);
     };
     img.onerror = (e) => {
-      console.error("Failed to load image", e);
+      console.error("Failed to load map image:", e);
     };
-    return () => {};
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // run once
+
+  // keyboard hold-to-move
+  useEffect(() => {
+    const keyToDir = {
+      ArrowUp: [0, -1],
+      ArrowDown: [0, 1],
+      ArrowLeft: [-1, 0],
+      ArrowRight: [1, 0],
+      w: [0, -1],
+      s: [0, 1],
+      a: [-1, 0],
+      d: [1, 0],
+    };
+
+    function performMoveFromDir(dir) {
+      if (!dir) return;
+      move(dir[0], dir[1]);
+    }
+
+    function startHold(dir) {
+      // single step
+      performMoveFromDir(dir);
+      // set repeating timer
+      if (holdRef.current.timer) clearInterval(holdRef.current.timer);
+      holdRef.current.dir = dir;
+      holdRef.current.timer = setInterval(() => performMoveFromDir(dir), HOLD_INTERVAL_MS);
+    }
+    function stopHold() {
+      if (holdRef.current.timer) {
+        clearInterval(holdRef.current.timer);
+        holdRef.current.timer = null;
+      }
+      holdRef.current.dir = null;
+    }
+
+    const onKeyDown = (e) => {
+      const key = e.key;
+      if (key === "+" || key === "=") { setZoom((z) => Math.min(MAX_ZOOM, +(z + 0.25).toFixed(2))); return; }
+      if (key === "-") { setZoom((z) => Math.max(MIN_ZOOM, +(z - 0.25).toFixed(2))); return; }
+      const dir = keyToDir[key] || keyToDir[key?.toLowerCase()];
+      if (dir) {
+        // if key repeat (holding physical key) browser will emit multiple keydown events;
+        // only start hold on first. We'll detect with holdRef.dir.
+        if (!holdRef.current.dir) startHold(dir);
+      }
+    };
+    const onKeyUp = (e) => {
+      const key = e.key;
+      const dir = keyToDir[key] || keyToDir[key?.toLowerCase()];
+      if (dir) stopHold();
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+    window.addEventListener("keyup", onKeyUp);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener("keyup", onKeyUp);
+      stopHold();
+    };
   }, []);
 
-  // update tilePx when zoom changes
-  useEffect(() => {
-    setTilePx(Math.max(2, Math.round(BASE_TILE_PX)));
-    // we use zoom to scale on-screen tile spacing; tilePx constant base
-    requestAnimationFrame(drawFrame);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [zoom]);
-
-  // keyboard controls (single-tile moves)
-  useEffect(() => {
-    const onKey = (e) => {
-      const k = e.key.toLowerCase();
-      if (["arrowup", "w"].includes(k)) move(0, -1);
-      if (["arrowdown", "s"].includes(k)) move(0, 1);
-      if (["arrowleft", "a"].includes(k)) move(-1, 0);
-      if (["arrowright", "d"].includes(k)) move(1, 0);
-      if (k === "-" ) setZoom((z) => Math.max(MIN_ZOOM, +(z - 0.1).toFixed(2)));
-      if (k === "=" || k === "+") setZoom((z) => Math.min(MAX_ZOOM, +(z + 0.1).toFixed(2)));
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, []);
+  // pointer (touch) hold for on-screen arrows - start/stop handled via onPointerDown/onPointerUp in UI
 
   // wheel zoom on canvas
   useEffect(() => {
     const el = canvasRef.current;
     if (!el) return;
-    const onWheel = (e) => {
-      if (e.ctrlKey) return; // avoid interfering with browser zoom
+    const wheel = (e) => {
+      if (e.ctrlKey) return;
       e.preventDefault();
       const delta = -e.deltaY * 0.0015;
       setZoom((z) => Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, +(z + delta).toFixed(3))));
     };
-    el.addEventListener("wheel", onWheel, { passive: false });
-    return () => el.removeEventListener("wheel", onWheel);
+    el.addEventListener("wheel", wheel, { passive: false });
+    return () => el.removeEventListener("wheel", wheel);
   }, []);
 
-  // handle resize
+  // when player/zoom/chunkOverlay changes, redraw
   useEffect(() => {
-    const r = () => {
-      if (!loaded) return;
-      drawFrame();
-      drawMinimap(imgRef.current);
-    };
-    window.addEventListener("resize", r);
-    return () => window.removeEventListener("resize", r);
-  }, [loaded, zoom, player]);
+    if (!loaded) return;
+    drawAll(imgRef.current, player, zoom, chunkOverlay);
+    drawMinimap(imgRef.current, player, zoom);
+  }, [player, zoom, chunkOverlay, loaded]);
 
-  // move function (1 tile)
+  // move helper: ensures player within bounds; draws next frame
   function move(dx, dy) {
     setPlayer((p) => {
       const nx = Math.max(0, Math.min(GRID_SIZE - 1, p.x + dx));
       const ny = Math.max(0, Math.min(GRID_SIZE - 1, p.y + dy));
       if (nx === p.x && ny === p.y) return p;
       const np = { x: nx, y: ny };
-      // draw immediately
-      requestAnimationFrame(() => {
-        drawFrame(np);
-        drawMinimap(imgRef.current, np);
-      });
+      // immediate draw to feel responsive
+      if (loaded) {
+        drawAll(imgRef.current, np, zoom, chunkOverlay);
+        drawMinimap(imgRef.current, np, zoom);
+      }
       return np;
     });
   }
 
-  // UI arrow handlers
-  function handleArrow(dx, dy) {
+  // pointer (touch) arrow handlers start/stop repeat
+  const startPointerHold = (dx, dy) => {
+    // single move + start interval
     move(dx, dy);
-  }
+    if (holdRef.current.timer) clearInterval(holdRef.current.timer);
+    holdRef.current.dir = [dx, dy];
+    holdRef.current.timer = setInterval(() => move(dx, dy), HOLD_INTERVAL_MS);
+  };
+  const stopPointerHold = () => {
+    if (holdRef.current.timer) {
+      clearInterval(holdRef.current.timer);
+      holdRef.current.timer = null;
+    }
+    holdRef.current.dir = null;
+  };
 
-  // core draw function
-  function drawFrame(forPlayer) {
+  // chunk toggle button styling handled in CSS; toggles chunkOverlay
+  const toggleChunks = () => setChunkOverlay((s) => !s);
+
+  // draw everything: viewport (texture) + grid overlay + chunk overlay + player marker
+  function drawAll(img, p, z, showChunks) {
     const canvas = canvasRef.current;
-    const img = imgRef.current;
     if (!canvas || !img) return;
-    const p = forPlayer || player;
     const ctx = canvas.getContext("2d");
     const DPR = window.devicePixelRatio || 1;
 
-    // choose viewport size responsive (we keep it within window but not full width to allow sidebar)
+    // viewport CSS size (leave space for sidebar)
     const vw = Math.max(320, Math.min(window.innerWidth * 0.78, 1200));
     const vh = Math.max(240, Math.min(window.innerHeight * 0.86, 800));
     canvas.width = Math.floor(vw * DPR);
@@ -142,53 +185,47 @@ export default function NarutoWorldMap() {
 
     ctx.clearRect(0, 0, vw, vh);
 
-    // Determine visible tile count based on base tilePx and zoom
-    const displayTilePx = tilePx * zoom; // final pixel size for a single logical tile on screen
+    // determine how many tiles fit and mapping between image pixels and grid tiles
+    const displayTilePx = BASE_TILE_PX * z; // how many screen pixels represent one logical tile
     const tilesAcross = vw / displayTilePx;
     const tilesDown = vh / displayTilePx;
 
-    // source width/height in image pixels (how many image pixels correspond to visible tiles)
-    const pxPerTileInImageX = img.width / GRID_SIZE;
-    const pxPerTileInImageY = img.height / GRID_SIZE;
+    // image pixels per tile
+    const pxPerTileX = img.width / GRID_SIZE;
+    const pxPerTileY = img.height / GRID_SIZE;
 
-    const numTilesX = tilesAcross;
-    const numTilesY = tilesDown;
+    // compute source rect in image pixels centered on player's tile
+    const srcW = tilesAcross * pxPerTileX;
+    const srcH = tilesDown * pxPerTileY;
+    const centerImgX = (p.x + 0.5) * pxPerTileX;
+    const centerImgY = (p.y + 0.5) * pxPerTileY;
 
-    const srcW = numTilesX * pxPerTileInImageX;
-    const srcH = numTilesY * pxPerTileInImageY;
+    let srcX = Math.round(centerImgX - srcW / 2);
+    let srcY = Math.round(centerImgY - srcH / 2);
 
-    // center in image pixels on player tile center
-    const centerX_img = (p.x + 0.5) * pxPerTileInImageX;
-    const centerY_img = (p.y + 0.5) * pxPerTileInImageY;
-
-    let srcX = Math.round(centerX_img - srcW / 2);
-    let srcY = Math.round(centerY_img - srcH / 2);
-
-    // clamp to image bounds
+    // clamp to image bounds to avoid reading outside
     if (srcX < 0) srcX = 0;
     if (srcY < 0) srcY = 0;
     if (srcX + srcW > img.width) srcX = Math.max(0, img.width - srcW);
     if (srcY + srcH > img.height) srcY = Math.max(0, img.height - srcH);
 
-    // draw that source rect stretched to viewport
-    ctx.imageSmoothingEnabled = false; // avoid smoothing — but the visible image will still be crisp
+    // draw the source rect stretched exactly to viewport
+    ctx.imageSmoothingEnabled = false;
     ctx.drawImage(img, srcX, srcY, srcW, srcH, 0, 0, vw, vh);
 
-    // overlay: subtle dim to help UI
-    // ctx.fillStyle = 'rgba(0,0,0,0.03)'; ctx.fillRect(0,0,vw,vh);
+    // compute which tile index is at viewport top-left (floating)
+    const topLeftTileXFloat = srcX / pxPerTileX;
+    const topLeftTileYFloat = srcY / pxPerTileY;
 
-    // draw grid overlay lines for tile borders
+    // compute offset of top-left tile in screen pixels (could be fractional)
+    const offsetX = -(topLeftTileXFloat - Math.floor(topLeftTileXFloat)) * displayTilePx;
+    const offsetY = -(topLeftTileYFloat - Math.floor(topLeftTileYFloat)) * displayTilePx;
+
+    // draw grid overlay (thin lines)
     ctx.save();
-    ctx.lineWidth = Math.max(1, Math.ceil(displayTilePx * 0.06));
+    ctx.lineWidth = Math.max(1, Math.round(displayTilePx * 0.06));
     ctx.strokeStyle = "rgba(0,0,0,0.35)";
-    // compute pixel offset where the first tile starts on-screen
-    const startTileX = Math.floor((srcX / pxPerTileInImageX)); // which tile index is leftmost
-    const startTileY = Math.floor((srcY / pxPerTileInImageY)); // topmost tile index
-    // offset in pixels inside viewport for first tile
-    const offsetX = -((srcX / pxPerTileInImageX) - startTileX) * displayTilePx;
-    const offsetY = -((srcY / pxPerTileInImageY) - startTileY) * displayTilePx;
 
-    // vertical lines
     const cols = Math.ceil(vw / displayTilePx) + 2;
     for (let i = 0; i <= cols; i++) {
       const x = offsetX + i * displayTilePx + 0.5;
@@ -197,7 +234,6 @@ export default function NarutoWorldMap() {
       ctx.lineTo(x, vh);
       ctx.stroke();
     }
-    // horizontal lines
     const rows = Math.ceil(vh / displayTilePx) + 2;
     for (let j = 0; j <= rows; j++) {
       const y = offsetY + j * displayTilePx + 0.5;
@@ -208,25 +244,59 @@ export default function NarutoWorldMap() {
     }
     ctx.restore();
 
-    // draw player marker centered
-    const centerX = Math.round(vw / 2);
-    const centerY = Math.round(vh / 2);
+    // chunk overlay (16x16)
+    if (showChunks) {
+      ctx.save();
+      ctx.strokeStyle = "rgba(255,165,0,0.55)"; // orange-ish
+      ctx.lineWidth = Math.max(1, Math.round(displayTilePx * 0.08));
+      const chunkTilePx = displayTilePx * CHUNK_SIZE;
+      // determine first chunk offset relative to top-left
+      // find top-left chunk tile coordinate
+      const topChunkX = Math.floor(topLeftTileXFloat / CHUNK_SIZE);
+      const topChunkY = Math.floor(topLeftTileYFloat / CHUNK_SIZE);
+
+      // draw chunk vertical lines
+      const chunksAcross = Math.ceil((cols + 2) / CHUNK_SIZE) + 4;
+      const chunksDown = Math.ceil((rows + 2) / CHUNK_SIZE) + 4;
+      for (let cx = -2; cx < chunksAcross; cx++) {
+        const x = offsetX + (cx * CHUNK_SIZE) * displayTilePx + 0.5;
+        ctx.beginPath();
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x, vh);
+        ctx.stroke();
+      }
+      for (let cy = -2; cy < chunksDown; cy++) {
+        const y = offsetY + (cy * CHUNK_SIZE) * displayTilePx + 0.5;
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        ctx.lineTo(vw, y);
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+
+    // player screen coordinates: compute player's position relative to top-left tile
+    const playerScreenX = Math.round((p.x - topLeftTileXFloat + 0.5) * displayTilePx);
+    const playerScreenY = Math.round((p.y - topLeftTileYFloat + 0.5) * displayTilePx);
+
+    // draw player at computed position
     ctx.beginPath();
     ctx.fillStyle = "#ff4b4b";
-    ctx.arc(centerX, centerY, Math.max(4, Math.round(displayTilePx * 0.35)), 0, Math.PI * 2);
+    const r = Math.max(4, Math.round(displayTilePx * 0.35));
+    ctx.arc(playerScreenX, playerScreenY, r, 0, Math.PI * 2);
     ctx.fill();
     ctx.lineWidth = 2;
-    ctx.strokeStyle = "#ffffff";
+    ctx.strokeStyle = "#fff";
     ctx.stroke();
 
-    // coordinates label bottom-left
+    // coords overlay
     ctx.font = "13px Inter, Arial";
-    ctx.fillStyle = "rgba(255,255,255,0.9)";
-    ctx.fillText(`x:${p.x} y:${p.y}  zoom:${Math.round(zoom*100)/100}`, 8, vh - 10);
+    ctx.fillStyle = "rgba(255,255,255,0.95)";
+    ctx.fillText(`x:${p.x} y:${p.y}  zoom:${Math.round(z * 100) / 100}`, 8, vh - 10);
   }
 
-  // draw minimap (full image scaled to small canvas)
-  function drawMinimap(img = imgRef.current, forPlayer = player) {
+  // minimap rendering
+  function drawMinimap(img, p, z = zoom) {
     const mini = miniRef.current;
     if (!mini || !img) return;
     const ctx = mini.getContext("2d");
@@ -241,17 +311,17 @@ export default function NarutoWorldMap() {
     ctx.imageSmoothingEnabled = true;
     ctx.drawImage(img, 0, 0, size, size);
 
-    // draw viewport rect
+    // compute viewport rect on minimap
     const vw = parseFloat(canvasRef.current.style.width) || Math.min(window.innerWidth * 0.78, 1200);
     const vh = parseFloat(canvasRef.current.style.height) || Math.min(window.innerHeight * 0.86, 800);
-    const displayTilePx = tilePx * zoom;
+    const displayTilePx = BASE_TILE_PX * z;
     const tilesAcross = vw / displayTilePx;
     const tilesDown = vh / displayTilePx;
 
-    const startX_tile = forPlayer.x - tilesAcross/2;
-    const startY_tile = forPlayer.y - tilesDown/2;
-    const sx = (startX_tile / GRID_SIZE) * size;
-    const sy = (startY_tile / GRID_SIZE) * size;
+    const startTileX = p.x - tilesAcross / 2;
+    const startTileY = p.y - tilesDown / 2;
+    const sx = (startTileX / GRID_SIZE) * size;
+    const sy = (startTileY / GRID_SIZE) * size;
     const sw = (tilesAcross / GRID_SIZE) * size;
     const sh = (tilesDown / GRID_SIZE) * size;
 
@@ -260,58 +330,41 @@ export default function NarutoWorldMap() {
     ctx.strokeRect(sx + 0.5, sy + 0.5, Math.max(2, sw), Math.max(2, sh));
   }
 
-  // expose zoom controls quickly
-  function zoomIn() {
-    setZoom((z) => Math.min(MAX_ZOOM, +(z + 0.25).toFixed(2)));
-    requestAnimationFrame(() => drawFrame());
-    requestAnimationFrame(() => drawMinimap());
+  // UI handlers
+  function onArrowDown(dx, dy) {
+    startPointerHold(dx, dy);
   }
-  function zoomOut() {
-    setZoom((z) => Math.max(MIN_ZOOM, +(z - 0.25).toFixed(2)));
-    requestAnimationFrame(() => drawFrame());
-    requestAnimationFrame(() => drawMinimap());
+  function onArrowUp() {
+    stopPointerHold();
   }
-
-  // request redraw when loaded/player/zoom changes
-  useEffect(() => {
-    if (!loaded) return;
-    // cancel previous rAF
-    if (rafRef.current) cancelAnimationFrame(rafRef.current);
-    rafRef.current = requestAnimationFrame(() => {
-      drawFrame();
-      drawMinimap();
-    });
-    return () => {};
-  }, [loaded, player, zoom]);
-
-  // clean up RAF
-  useEffect(() => {
-    return () => {
-      if (rafRef.current) cancelAnimationFrame(rafRef.current);
-    };
-  }, []);
 
   return (
     <div className="naruto-map-root">
       <div className="naruto-map-left">
         <div className="viewport-wrap">
           <canvas ref={canvasRef} className="main-canvas" />
-          <div className="controls-bottom-centered">
+          <div className="top-right-ui">
+            <button className="chunk-btn" onClick={toggleChunks}>
+              {chunkOverlay ? "Hide Chunks" : "Show Chunks"}
+            </button>
+          </div>
+
+          <div className="controls-bottom-centered" onPointerUp={onArrowUp} onPointerCancel={onArrowUp}>
             <div className="arrow-grid">
-              <button className="arrow" onPointerDown={() => handleArrow(0, -1)}>▲</button>
+              <button className="arrow" onPointerDown={() => onArrowDown(0, -1)} onPointerUp={onArrowUp}>▲</button>
               <div style={{ display: "flex", gap: 10 }}>
-                <button className="arrow" onPointerDown={() => handleArrow(-1, 0)}>◀</button>
-                <button className="arrow" onPointerDown={() => handleArrow(1, 0)}>▶</button>
+                <button className="arrow" onPointerDown={() => onArrowDown(-1, 0)} onPointerUp={onArrowUp}>◀</button>
+                <button className="arrow" onPointerDown={() => onArrowDown(1, 0)} onPointerUp={onArrowUp}>▶</button>
               </div>
-              <button className="arrow" onPointerDown={() => handleArrow(0, 1)}>▼</button>
+              <button className="arrow" onPointerDown={() => onArrowDown(0, 1)} onPointerUp={onArrowUp}>▼</button>
             </div>
           </div>
         </div>
 
         <div className="mini-zoom-row">
-          <button onClick={zoomOut}>-</button>
+          <button onClick={() => { setZoom((z) => Math.max(MIN_ZOOM, +(z - 0.25).toFixed(2))); }}>-</button>
           <div className="zoom-label">Zoom {Math.round(zoom * 100) / 100}</div>
-          <button onClick={zoomIn}>+</button>
+          <button onClick={() => { setZoom((z) => Math.min(MAX_ZOOM, +(z + 0.25).toFixed(2))); }}>+</button>
           <div style={{ width: 12 }} />
           <div className="coords">x:{player.x} y:{player.y}</div>
         </div>
@@ -324,9 +377,9 @@ export default function NarutoWorldMap() {
         <div className="legend">
           <div className="legend-title">Controls</div>
           <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 8 }}>
-            <div style={{ color: "#d7e8ff" }}>WASD / Arrows = move 1 tile</div>
+            <div style={{ color: "#d7e8ff" }}>WASD / Arrows = move 1 tile (hold to repeat)</div>
             <div style={{ color: "#d7e8ff" }}>Mouse wheel = zoom</div>
-            <div style={{ color: "#d7e8ff" }}>Use on-screen arrows for touch</div>
+            <div style={{ color: "#d7e8ff" }}>Chunks = 16×16 toggle</div>
           </div>
         </div>
       </aside>
