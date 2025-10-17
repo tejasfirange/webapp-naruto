@@ -1,0 +1,76 @@
+.map-container {
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  position: relative;
+  background: #0d0d0d;
+}
+
+.map {
+  position: absolute;
+  width: max-content;
+  height: max-content;
+  transition: transform 0.15s ease-out;
+}
+
+.tile {
+  position: absolute;
+  width: 32px;
+  height: 32px;
+  box-shadow: inset 0 0 1px rgba(0, 0, 0, 0.4);
+}
+
+/* 🏞️ Biome Styles */
+.tile.grass {
+  background: linear-gradient(135deg, #4caf50, #2e7d32);
+}
+.tile.forest {
+  background: radial-gradient(circle at 30% 30%, #1b5e20, #0d4d10);
+}
+.tile.sand {
+  background: linear-gradient(135deg, #e6d480, #d4b060);
+}
+.tile.water {
+  background: linear-gradient(135deg, #4fa3f7, #0077c8);
+}
+.tile.mountain {
+  background: linear-gradient(135deg, #9e9e9e, #5e5e5e);
+}
+.tile.snow {
+  background: linear-gradient(135deg, #eaeaea, #cfd8dc);
+}
+
+/* 👣 Player */
+.tile.player {
+  border: 2px solid white;
+  border-radius: 50%;
+  background: radial-gradient(circle, #ff4b4b 0%, #c21807 90%);
+  z-index: 5;
+}
+
+/* 🎮 Controls */
+.controls {
+  position: fixed;
+  bottom: 40px;
+  left: 40px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: center;
+  z-index: 10;
+}
+
+.controls button {
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  background: #263238;
+  color: white;
+  font-size: 18px;
+  border: none;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.controls button:hover {
+  background: #37474f;
+}
